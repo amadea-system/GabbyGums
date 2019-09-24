@@ -1,0 +1,13 @@
+.env
+.venv
+env/
+venv/
+.idea/
+scripts/
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+config.json
+config.*.json

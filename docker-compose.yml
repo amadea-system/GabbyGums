@@ -1,0 +1,20 @@
+version: "3"
+services:
+   bot:
+      build: src/
+      entrypoint:
+      - python
+      - GabbyGums.py
+      volumes:
+        - "./config.json:/app/config.json"
+      depends_on:
+      - db
+      restart: always
+   db:
+      image: postgres:alpine
+      volumes:
+      - "db_data:/var/lib/postgresql/data"
+      restart: always
+
+volumes:
+   db_data:
