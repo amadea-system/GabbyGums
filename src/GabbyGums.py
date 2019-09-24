@@ -5,6 +5,7 @@
 
 import discord
 from discord.ext import commands
+from discord.utils import oauth_url
 import aiohttp
 import time
 from typing import Optional
@@ -37,8 +38,6 @@ Add more events to be logged.
 
 '''
 
-#!!!!!!SELECTS BETWEEN USING THE BETA CONFIG AND PRODUCTION CONFIG!!!!!!
-BETA_MODE = True  # TODO: Use environment variables
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s")
 
@@ -50,15 +49,11 @@ client = commands.Bot(command_prefix="g!",
 client.remove_command("help")  # Remove the built in help command so we can make the about section look nicer.
 
 
-#Beta invite:
-#https://discordapp.com/oauth2/authorize?client_id=500711975207174144&scope=bot&permissions=380096
-
-
 @client.event
 async def on_ready():
-    print('Connected!')
-    print('Username: {0.name}\nID: {0.id}'.format(client.user))
-    print('------')
+    logging.info('Connected!')
+    logging.info('Username: {0.name}, ID: {0.id}'.format(client.user))
+    logging.info('------')
 
     activity = discord.Game("{}help".format(client.command_prefix))
     await client.change_presence(status=discord.Status.online, activity=activity)
@@ -89,7 +84,7 @@ async def _about(ctx):
 async def is_channel_ignored(pool: asyncpg.pool.Pool, guild_id: int, channel_id:int) -> bool:
     _ignored_channels = await db.get_ignored_channels(pool, guild_id)
     if channel_id in _ignored_channels:
-        return True  # TODO: Optomise this
+        return True  # TODO: Optimise this
     return False
 
 
@@ -218,6 +213,16 @@ async def reset_server_info(ctx):
 
 # ----- Misc Commands ----- #
 
+@client.command(name='invite',
+                brief='Get an invite for Gabby Gums.',
+                description='get an invite for Gabby Gums.')
+async def invite_command(ctx):
+    # Todo: Calculate permissions instead of hardcoding and use discord.utils.oauth_url
+    invite = "https://discordapp.com/oauth2/authorize?client_id={}&scope=bot&permissions={}".format(client.user.id, 380096)
+    await ctx.send("Here's a link to invite Gabby Gums to your server:")
+    await ctx.send(invite)
+
+
 @client.command(name='ping',
                 brief='Shows the current bot latency.',
                 description='Shows the current bot latency.')
@@ -235,7 +240,7 @@ async def ping_command(ctx):
     # Sends a message to the user in the channel the message with the command was received.
     # Notifies the user that pinging has started
     new_embed = discord.Embed(title="Pong!",
-                             description="Round trip messaging time: **{:.2f} ms**. \n API latency: **{:.2f} ms**.\n Database latency: **{:.2f} ms**".
+                              description="Round trip messaging time: **{:.2f} ms**. \n API latency: **{:.2f} ms**.\n Database latency: **{:.2f} ms**".
                              format((time.perf_counter() - start)*1000, client.latency*1000, (db_end - db_start)*1000), color=0x00b7fa)
     await msg.edit(embed=new_embed)
 
@@ -350,13 +355,6 @@ async def verify_permissions(ctx, guild_id: Optional[str] = None):
     await ctx.send(embed=embed)
 
 
-@client.command(name='crash', brief='causes the bot to throw an exception')
-@commands.is_owner()
-async def crash_command(ctx):
-    await ctx.send("Crashing!")
-    assert 1 == 0
-
-
 @commands.is_owner()
 @client.command(name="dump")
 async def dump(ctx, table: str):
@@ -378,6 +376,7 @@ async def test_cmd(ctx, server_id: int):
 
 # ---- Command Error Handling ----- #
 
+
 @client.event
 async def on_command_error(ctx, error):
     if type(error) == discord.ext.commands.NoPrivateMessage:
@@ -395,30 +394,7 @@ async def on_command_error(ctx, error):
         raise error
 
 
-@client.event
-async def on_error(event_name, *args):
-    logging.exception("Exception from event {}".format(event_name))
-
-    if 'error_log_channel' not in config:
-        return
-    error_log_channel = client.get_channel(config['error_log_channel'])
-
-    embed = None
-    # Determine if we can get more, otherwise post without embed
-    if args and type(args[0]) == discord.Message:
-        message: discord.Message = args[0]
-        embeds.exception(message)
-    elif args and type(args[0]) == discord.RawMessageUpdateEvent:
-        logging.error("After Content:{}.".format(args[0].data['content']))
-        if args[0].cached_message is not None:
-            logging.error("Before Content:{}.".format(args[0].cached_message.content))
-
-    traceback_message = "```python\n{}```".format(traceback.format_exc())
-    traceback_message = (traceback_message[:1993] + ' ...```') if len(traceback_message) > 2000 else traceback_message
-    await error_log_channel.send(content=traceback_message, embed=embed)
-
-
-async def get_guild_logging_channel(guild_id):
+async def get_guild_logging_channel(guild_id: int) -> Optional[discord.TextChannel]:
 
     _log_channel_id = await db.get_log_channel(pool, guild_id)
     if _log_channel_id is not None:
@@ -431,12 +407,36 @@ async def get_guild_logging_channel(guild_id):
     return None
 
 
-async def get_channel_safe(channel_id: int):
+async def get_channel_safe(channel_id: int) -> discord.TextChannel:
     channel = client.get_channel(channel_id)
     if channel is None:
         print("get ch failed. WHY?????")
         channel = await client.fetch_channel(channel_id)
     return channel
+
+
+@client.event
+async def on_error(event_name, *args):
+    logging.exception("Exception from event {}".format(event_name))
+
+    if 'error_log_channel' not in config:
+        return
+    error_log_channel = client.get_channel(config['error_log_channel'])
+
+    embed = None
+    # Determine if we can get more info, otherwise post without embed
+    if args and type(args[0]) == discord.Message:
+        message: discord.Message = args[0]
+        embeds.exception_w_message(message)
+    elif args and type(args[0]) == discord.RawMessageUpdateEvent:
+        logging.error("After Content:{}.".format(args[0].data['content']))
+        if args[0].cached_message is not None:
+            logging.error("Before Content:{}.".format(args[0].cached_message.content))
+    #Todo: Add more
+
+    traceback_message = "```python\n{}```".format(traceback.format_exc())
+    traceback_message = (traceback_message[:1993] + ' ...```') if len(traceback_message) > 2000 else traceback_message
+    await error_log_channel.send(content=traceback_message, embed=embed)
 
 
 @client.event
@@ -638,10 +638,11 @@ async def on_guild_unavailable(guild: discord.Guild):
 
 if __name__ == '__main__':
 
-    pool = asyncio.get_event_loop().run_until_complete(db.create_db_pool('postgres://postgres:postgres@db:5432/postgres'))
-
     with open('config.json') as json_data_file:
         config = json.load(json_data_file)
+
+    pool = asyncio.get_event_loop().run_until_complete(db.create_db_pool(config['db_uri']))
+    asyncio.get_event_loop().run_until_complete(db.create_tables(pool))
 
     client.command_prefix = config['bot_prefix']
     client.run(config['token'])

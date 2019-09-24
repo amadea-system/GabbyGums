@@ -144,55 +144,55 @@ async def create_tables(pool):
     # Create servers table
     async with pool.acquire() as conn:
         await conn.execute('''
-                       CREATE TABLE if not exists servers(
-                           server_id BIGINT PRIMARY KEY,
-                           server_name TEXT,
-                           log_channel_id BIGINT,
-                           logging_enabled BOOLEAN,
-                           ignored_member_ids BIGINT[],
-                           ignored_channel_ids BIGINT[]
-                       )
-                   ''')
-
-        # Create ignored_channels table
-        await conn.execute('''
-                       CREATE TABLE if not exists ignored_channels(
-                           id SERIAL PRIMARY KEY ,
-                           channel_id BIGINT,
-                           server_id BIGINT
-                       )
-                   ''')
-
-        # Create ignored_users table
-        await conn.execute('''
-                           CREATE TABLE if not exists ignored_users(
-                               id SERIAL PRIMARY KEY ,
-                               user_id BIGINT,
-                               server_id BIGINT
+                           CREATE TABLE if not exists servers(
+                               server_id BIGINT PRIMARY KEY,
+                               server_name TEXT,
+                               log_channel_id BIGINT,
+                               logging_enabled BOOLEAN NOT NULL DEFAULT TRUE
                            )
                        ''')
 
+        # Create ignored_channels table
+        await conn.execute('''
+                           CREATE TABLE if not exists ignored_channels(
+                                id SERIAL PRIMARY KEY,
+                                server_id BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
+                                channel_id BIGINT NOT NULL,
+                                UNIQUE (server_id, channel_id)
+                           )
+                       ''')
+
+        # Create ignored_users table
+        await conn.execute('''
+                               CREATE TABLE if not exists ignored_users(
+                                    id           SERIAL PRIMARY KEY,
+                                    server_id    BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE, 
+                                    user_id      BIGINT NOT NULL,
+                                    UNIQUE (server_id, user_id)
+                               )
+                           ''')
+
         # Create invites table
         await conn.execute('''
-                          CREATE TABLE if not exists invites(
-                              id SERIAL PRIMARY KEY,
-                              invite_id TEXT,
-                              server_id BIGINT,
-                              uses INTEGER,
-                              invite_name TEXT,
-                              invite_description TEXT
-                          )
-                      ''')
+                              CREATE TABLE if not exists invites(
+                                  id            SERIAL PRIMARY KEY,
+                                  server_id     BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
+                                  invite_id     TEXT NOT NULL,
+                                  uses          INTEGER NOT NULL DEFAULT 0,
+                                  invite_name   TEXT,
+                                  invite_desc   TEXT
+                              )
+                          ''')
 
         # Create username_tracking table
         await conn.execute('''
-                       CREATE TABLE if not exists past_names(
-                           id SERIAL PRIMARY KEY,
-                           server_id BIGINT,
-                           user_id BIGINT,
-                           name TEXT,
-                           discriminator SMALLINT,
-                           nickname TEXT
-                       )
-                   ''')
+                           CREATE TABLE if not exists past_names(
+                               id           SERIAL PRIMARY KEY,
+                               server_id    BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
+                               user_id      BIGINT NOT NULL,
+                               name         TEXT,
+                               discriminator SMALLINT,
+                               nickname     TEXT
+                           )
+                       ''')
 

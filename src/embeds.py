@@ -7,7 +7,9 @@ from datetime import datetime
 
 # TODO: Make these all async?
 
+
 def split_message(message: str) -> (str, str):
+    # TODO: Make better
     msg1 = message[:1000]
     msg2 = message[1000:]
     return msg1, msg2
@@ -36,7 +38,7 @@ def about_message() -> discord.Embed:
                           "or anything else, feel free to join our support server @ https://discord.gg/3Ugade9")
 
     embed.set_footer(text="Created by Luna, Hibiki, and Fluttershy aka Amadea System (Hibiki#8792) "
-                          "| Github: Coming soon")
+                          "| Github: https://github.com/amadea-system/GabbyGums/")
 
     return embed
 
@@ -51,7 +53,7 @@ def edited_message(author_id, author_name: str, author_discrim, channel_id, befo
                           color=0x61cd72, timestamp=datetime.utcnow())
 
     embed.set_thumbnail(
-        url="https://images-ext-1.discordapp.net/external/jKVqt1gAKeL53WO3VbpjByBRw_LreKs9TJuklEHdk7c/http/i.imgur.com/Q8SzUdG.png")
+        url="https://i.imgur.com/Q8SzUdG.png")
     embed.add_field(name="Info:",
                     value="A message by <@{author_id}>, was edited in <#{channel_id}>\n"
                           "[Go To Message](https://discordapp.com/channels/{guild_id}/{channel_id}/{message_id})".format(author_id=author_id, channel_id=channel_id, guild_id=guild_id, message_id=message_id),
@@ -165,7 +167,7 @@ def member_nick_update(before: discord.Member, after: discord.Member) -> discord
     return embed
 
 
-def exception(message: discord.Message) -> discord.Embed:
+def exception_w_message(message: discord.Message) -> discord.Embed:
     embed = discord.Embed()
     embed.colour = 0xa50000
     embed.title = message.content
