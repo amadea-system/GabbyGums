@@ -372,29 +372,28 @@ async def dump(ctx, table: str):
 
 @commands.is_owner()
 @client.command(name="test")
-async def test_cmd(ctx, server_id: int):
-    res = await db.ensure_server_exists(pool, server_id)
-    await ctx.send("{}".format(res))
+async def test_cmd(ctx):
+    pass
 
 
 # ---- Command Error Handling ----- #
 @client.event
 async def on_command_error(ctx, error):
     if type(error) == discord.ext.commands.NoPrivateMessage:
-        await ctx.send("This command can not be used in DMs!!!")
+        await ctx.send("⚠ This command can not be used in DMs!!!")
         return
     elif type(error) == discord.ext.commands.CommandNotFound:
-        await ctx.send("Invalid Command!!!")
+        await ctx.send("⚠ Invalid Command!!!")
         return
     elif type(error) == discord.ext.commands.MissingPermissions:
-        await ctx.send("You need the **Manage Messages** permission to use this command".format(error.missing_perms))
+        await ctx.send("⚠ You need the **Manage Messages** permission to use this command".format(error.missing_perms))
         return
     elif type(error) == discord.ext.commands.MissingRequiredArgument:
-        await ctx.send(error)
+        await ctx.send("⚠ {}".format(error))
     elif type(error) == discord.ext.commands.BadArgument:
-        await ctx.send(error)
+        await ctx.send("⚠ {}".format(error))
     else:
-        await ctx.send(error)
+        await ctx.send("⚠ {}".format(error))
         raise error
 
 
