@@ -496,7 +496,7 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
             # This is a Gabby Gums message. Do not log the event.
             return
 
-        if await is_user_ignored(pool, guild_id, author.id):
+        if await is_user_ignored(pool, guild_id, author_id):
             return
 
         if await is_channel_ignored(pool, guild_id, channel_id):
