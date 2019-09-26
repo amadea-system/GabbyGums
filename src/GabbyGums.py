@@ -20,24 +20,6 @@ import asyncio
 
 import db
 
-# TODO: Feature Todo List
-'''
-Add functionality to set specific channels to be ignored.
-
-Add invite command. (Way in the future or make it so it can't be used or something. 
-    I don't want this bot poping up in random servers YET)
-    
-Add functionality to log specific events to specific log channels?
-
-Add functionality to disable logging for specific events.
-
-Add functionality to spoiler deleted/edited messages from NSFW channels
-
-Add more events to be logged.
-
-
-'''
-
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s")
 
@@ -47,6 +29,40 @@ client = commands.Bot(command_prefix="g!",
                       owner_id=389590659335716867,
                       case_insensitive=True)
 client.remove_command("help")  # Remove the built in help command so we can make the about section look nicer.
+
+
+async def is_channel_ignored(pool: asyncpg.pool.Pool, guild_id: int, channel_id:int) -> bool:
+    _ignored_channels = await db.get_ignored_channels(pool, guild_id)
+    if channel_id in _ignored_channels:
+        return True  # TODO: Optimise this
+    return False
+
+
+async def is_user_ignored(pool, guild_id:int, user_id:int) -> bool:
+    _ignored_users = await db.get_ignored_users(pool, guild_id)
+    if user_id in _ignored_users:
+        return True# This is a message from a user the guild does not wish to log. Do not log the event.
+    return False
+
+
+async def get_guild_logging_channel(guild_id: int) -> Optional[discord.TextChannel]:
+
+    _log_channel_id = await db.get_log_channel(pool, guild_id)
+    if _log_channel_id is not None:
+        log_channel = client.get_channel(_log_channel_id)
+        if log_channel is None:
+            print("get_log_ch failed. WHY?????")
+            log_channel = await client.fetch_channel(_log_channel_id)
+        return log_channel
+    return None
+
+
+async def get_channel_safe(channel_id: int) -> discord.TextChannel:
+    channel = client.get_channel(channel_id)
+    if channel is None:
+        print("get ch failed. WHY?????")
+        channel = await client.fetch_channel(channel_id)
+    return channel
 
 
 @client.event
@@ -59,8 +75,7 @@ async def on_ready():
     await client.change_presence(status=discord.Status.online, activity=activity)
 
 
-# ----- Logging Channel Commands ----- #
-
+# ----- Help & About Commands ----- #
 @client.command(name="Help", hidden=True)
 async def _help(ctx, *args):
 
@@ -81,37 +96,23 @@ async def _about(ctx):
     await ctx.send(embed=embeds.about_message())
 
 
-async def is_channel_ignored(pool: asyncpg.pool.Pool, guild_id: int, channel_id:int) -> bool:
-    _ignored_channels = await db.get_ignored_channels(pool, guild_id)
-    if channel_id in _ignored_channels:
-        return True  # TODO: Optimise this
-    return False
-
-
-async def is_user_ignored(pool, guild_id:int, user_id:int) -> bool:
-    _ignored_users = await db.get_ignored_users(pool, guild_id)
-    if user_id in _ignored_users:
-        return True# This is a message from a user the guild does not wish to log. Do not log the event.
-    return False
-
-
+# ----- Logging Channel Commands ----- #
 @commands.has_permissions(manage_messages=True)
 @commands.guild_only()
-@client.group(name="log_ch", brief="Sets/unsets/shows the channel currently assigned for logging.",
+@client.group(name="log_channel", brief="Sets/unsets/shows the channel currently assigned for logging.",
               description="Sets/unsets/shows the channel currently assigned for logging."
                           "\n Use `set` in the channel you want to designate for logging.",
-              usage='<command>')
+              usage='<command> [channel]')
 async def logging_channel(ctx):
     if ctx.invoked_subcommand is None:
         await ctx.send_help(logging_channel)
 
 
 @logging_channel.command(name="set", brief="Sets which channel the bot will log to.",
-                         description="Sets which channel the bot will log to."
-                                     "\n  Use this command in the channel you want to designate for logging.")
-async def set_logging_channel(ctx):
-    await db.update_log_channel(pool, ctx.guild.id, ctx.channel.id)
-    await ctx.send("Logging channel set to <#{}>".format(ctx.channel.id))
+                         description="Sets which channel the bot will log to.")
+async def set_logging_channel(ctx, channel: discord.TextChannel):
+    await db.update_log_channel(pool, ctx.guild.id, channel.id)
+    await ctx.send("Logging channel set to <#{}>".format(channel.id))
 
 
 @logging_channel.command(name="unset", brief="Unsets the log channel", description="Unsets the log channel")
@@ -355,6 +356,7 @@ async def verify_permissions(ctx, guild_id: Optional[str] = None):
     await ctx.send(embed=embed)
 
 
+# ----- Debugging Channel Commands ----- #
 @commands.is_owner()
 @client.command(name="dump")
 async def dump(ctx, table: str):
@@ -374,9 +376,8 @@ async def test_cmd(ctx, server_id: int):
     res = await db.ensure_server_exists(pool, server_id)
     await ctx.send("{}".format(res))
 
+
 # ---- Command Error Handling ----- #
-
-
 @client.event
 async def on_command_error(ctx, error):
     if type(error) == discord.ext.commands.NoPrivateMessage:
@@ -390,31 +391,14 @@ async def on_command_error(ctx, error):
         return
     elif type(error) == discord.ext.commands.MissingRequiredArgument:
         await ctx.send(error)
+    elif type(error) == discord.ext.commands.BadArgument:
+        await ctx.send(error)
     else:
+        await ctx.send(error)
         raise error
 
 
-async def get_guild_logging_channel(guild_id: int) -> Optional[discord.TextChannel]:
-
-    _log_channel_id = await db.get_log_channel(pool, guild_id)
-    if _log_channel_id is not None:
-        log_channel = client.get_channel(_log_channel_id)
-        if log_channel is None:
-            print("get_log_ch failed. WHY?????")
-            log_channel = await client.fetch_channel(_log_channel_id)
-        return log_channel
-
-    return None
-
-
-async def get_channel_safe(channel_id: int) -> discord.TextChannel:
-    channel = client.get_channel(channel_id)
-    if channel is None:
-        print("get ch failed. WHY?????")
-        channel = await client.fetch_channel(channel_id)
-    return channel
-
-
+# ----- Discord Events ----- #
 @client.event
 async def on_error(event_name, *args):
     logging.exception("Exception from event {}".format(event_name))
