@@ -8,7 +8,7 @@ from discord.ext import commands
 from discord.utils import oauth_url
 import aiohttp
 import time
-from typing import Optional
+from typing import Optional, List
 import json
 import os
 import logging
@@ -31,14 +31,14 @@ client = commands.Bot(command_prefix="g!",
 client.remove_command("help")  # Remove the built in help command so we can make the about section look nicer.
 
 
-async def is_channel_ignored(pool: asyncpg.pool.Pool, guild_id: int, channel_id:int) -> bool:
+async def is_channel_ignored(pool: asyncpg.pool.Pool, guild_id: int, channel_id: int) -> bool:
     _ignored_channels = await db.get_ignored_channels(pool, guild_id)
     if channel_id in _ignored_channels:
         return True  # TODO: Optimise this
     return False
 
 
-async def is_user_ignored(pool, guild_id:int, user_id:int) -> bool:
+async def is_user_ignored(pool, guild_id: int, user_id: int) -> bool:
     _ignored_users = await db.get_ignored_users(pool, guild_id)
     if user_id in _ignored_users:
         return True# This is a message from a user the guild does not wish to log. Do not log the event.
@@ -69,10 +69,16 @@ async def get_channel_safe(channel_id: int) -> discord.TextChannel:
 async def on_ready():
     logging.info('Connected!')
     logging.info('Username: {0.name}, ID: {0.id}'.format(client.user))
+    logging.info("Connected to {} servers.".format(len(client.guilds)))
     logging.info('------')
 
     activity = discord.Game("{}help".format(client.command_prefix))
     await client.change_presence(status=discord.Status.online, activity=activity)
+
+    # ensure the invite cache is upto date on connection.
+    logging.info("Refreshing Invite Cache.")
+    for guild in client.guilds:
+        await update_invite_cache(guild)
 
 
 # ----- Help & About Commands ----- #
@@ -212,12 +218,57 @@ async def reset_server_info(ctx):
     await ctx.send("**ALL Settings have been reset!**")
 
 
-# ----- Misc Commands ----- #
+# ----- Invite Commands ----- #
+@commands.has_permissions(manage_messages=True)
+@commands.guild_only()
+@client.group(name="invites",
+              brief="Allows for naming invites for easier identification and listing details about them.",
+              description="Allows for naming invites for easier identification and listing details about them.",
+              usage='<command> [Invite ID]')
+async def invite_manage(ctx):
+    if not ctx.guild.me.guild_permissions.manage_guild:
+        await ctx.send("⚠ Gabby gums needs the **Manage Server** permission for invite tracking.")
+        return
+    else:
+        if ctx.invoked_subcommand is None:
+            await ctx.send_help(invite_manage)
 
-@client.command(name='invite',
+
+@invite_manage.command(name="list", brief="Lists the invites in the server and if they have a defined name.")
+async def _list_invites(ctx):
+    if ctx.guild.me.guild_permissions.manage_guild:
+        await update_invite_cache(ctx.guild)  # refresh the invite cache.
+        invites: db.StoredInvites = await get_stored_invites(ctx.guild.id)
+        embed = discord.Embed(title="Current Invites", color=0x9932CC)
+
+        for invite in invites.invites:
+            embed.add_field(name=invite.invite_id,
+                            value="Uses: {}\n Nickname: {}".format(invite.uses, invite.invite_name))
+        await ctx.send(embed=embed)
+
+
+@invite_manage.command(name="name", brief="Lets you give an invite a nickname so it can be easier to identify.",
+                       usage='invites name [Invite ID] [Invite Nickname]')
+async def _name_invite(ctx, invite_id: discord.Invite, nickname: str = None):
+    if ctx.guild.me.guild_permissions.manage_guild:
+        await update_invite_cache(ctx.guild)  # refresh the invite cache.
+        await db.update_invite_name(pool, ctx.guild.id, invite_id.id, invite_name=nickname)
+        await ctx.send("{} has been given the nickname: {}".format(invite_id.id, nickname))
+
+
+@invite_manage.command(name="unname", brief="Removes the name from an invite.")
+async def _unname_invite(ctx, invite_id: discord.Invite):
+    if ctx.guild.me.guild_permissions.manage_guild:
+        await update_invite_cache(ctx.guild)  # refresh the invite cache.
+        await db.update_invite_name(pool, ctx.guild.id, invite_id.id)
+        await ctx.send("{} no longer has a nickname.".format(invite_id.id))
+
+
+# ----- Misc Commands ----- #
+@client.command(name='bot_invite',
                 brief='Get an invite for Gabby Gums.',
                 description='get an invite for Gabby Gums.')
-async def invite_command(ctx):
+async def invite_link_command(ctx):
     # Todo: Calculate permissions instead of hardcoding and use discord.utils.oauth_url
     invite = "https://discordapp.com/oauth2/authorize?client_id={}&scope=bot&permissions={}".format(client.user.id, 380096)
     await ctx.send("Here's a link to invite Gabby Gums to your server:")
@@ -287,9 +338,13 @@ async def verify_permissions(ctx, guild_id: Optional[str] = None):
     # ToDO: check for send permissions for ctx and log error if unavailable.
     embed = discord.Embed(title="Debug for {}".format(guild.name), color=0x61cd72)
 
-    perms = {'read': [], 'send': [], 'non-crit': []}
-
+    perms = {'read': [], 'send': [], 'non-crit': [], 'manage_guild': True}
     errors_found = False
+
+    if not guild.me.guild_permissions.manage_guild:
+        errors_found = True
+        perms['manage_guild'] = False
+
     for channel in guild.channels:
         channel: discord.TextChannel
         permissions: discord.Permissions = channel.guild.me.permissions_in(channel)
@@ -323,6 +378,11 @@ async def verify_permissions(ctx, guild_id: Optional[str] = None):
                    "and will be unable to use any of them as a logging channel:\n\n"
         send_msg = send_msg + "\n".join(perms['send'])
         embed.add_field(name="Send Messages Permissions Problems", value=send_msg, inline=True)
+
+    if not perms['manage_guild']:
+        embed.add_field(name="Manage Server Permissions Problems",
+                        value="Gabby Gums is missing the Manage Server permission. Invite code tracking will not be functional.",
+                        inline=True)
 
     if len(perms['non-crit']) > 0:
         noncrit_msg = "Warning! The following channels are missing a **Non-Critical** permission. " \
@@ -519,20 +579,108 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
 
         # try:
         await log_channel.send(embed=embed)
-        # except discord.errors.HTTPException as e:
-        #     error_channel = client.get_channel(config['log_channel'])
-        #     await error_channel.send("Error in {}".format(guild_id))
-        #     await error_channel.send(before_msg)
-        #     await error_channel.send(after_msg)
-        #     await error_channel.send("----------")
-        #     raise e
+
+
+async def get_stored_invites(guild_id: int) -> db.StoredInvites:
+    stored_invites = await db.get_invites(pool, guild_id)
+    return stored_invites
+
+
+async def update_invite_cache(guild: discord.Guild, invites: Optional[List[discord.Invite]] = None,
+                              stored_invites: Optional[db.StoredInvites] = None):
+    if not guild.me.guild_permissions.manage_guild:
+        return
+
+    if invites is None:
+        invites: List[discord.Invite] = await guild.invites()
+
+    for invite in invites:
+        await db.store_invite(pool, guild.id, invite.id, invite.uses)
+
+    if stored_invites is None:
+        stored_invites = await get_stored_invites(guild.id)
+
+    await remove_invalid_invites(guild.id, invites, stored_invites)
+
+
+async def remove_invalid_invites(guild_id: int, current_invites: List[discord.Invite], stored_invites: Optional[db.StoredInvites]):
+
+    def search_for_invite(_current_invites: List[discord.Invite], invite_id):
+        for invite in _current_invites:
+            if invite.id == invite_id:
+                return invite
+        return None
+
+    for stored_invite in stored_invites.invites:
+        current_invite = search_for_invite(current_invites, stored_invite.invite_id)
+        if current_invite is None:
+            await db.remove_invite(pool, guild_id, stored_invite.invite_id)
+
+
+async def find_used_invite(member: discord.Member) -> Optional[db.StoredInvite]:
+
+    stored_invites: db.StoredInvites = await get_stored_invites(member.guild.id)
+    current_invites: List[discord.Invite] = await member.guild.invites()
+
+    if member.bot:
+        # The member is a bot. An oauth invite was used.
+        await update_invite_cache(member.guild, invites=current_invites)
+        return None
+
+    new_invites: List[discord.Invite] = []  # This is where we will store newly created invites.
+    # invite_used: Optional[db.StoredInvite] = None
+    for current_invite in current_invites:
+        stored_invite = stored_invites.find_invite(current_invite.id)
+        if stored_invite is None:
+            new_invites.append(current_invite)  # This is a new Invite. store it so we have it in case we need it
+        else:
+            if current_invite.uses > stored_invite.uses:
+                # We have a matched invite!
+                stored_invite.uses = current_invite.uses  # Correct the count of the stored invite.
+                stored_invite.actual_invite = current_invite
+                await update_invite_cache(member.guild, invites=current_invites)
+                return stored_invite  # Todo: FIX! This works, unless we somehow missed the last user join.
+            else:
+                pass  # not the used invite. look at the next invite.
+    # We scanned through all the current invites and was unable to find a match from the cache. Look through new invites
+
+    for new_invite in new_invites:
+        if new_invite.uses > 0:
+            # Todo: FIX! This works, unless we somehow missed the last user join.
+            invite_used = db.StoredInvite(server_id=new_invite.guild.id, invite_id=new_invite.id,
+                                          uses=new_invite.uses, invite_name="New Invite!")
+            await update_invite_cache(member.guild, invites=current_invites)
+            return invite_used
+
+    # Somehow we STILL haven't found the invite that was used... I don't think we should ever get here, unless I forgot something...
+    # We should never get here, so log it very verbosly in case we do so I can avoid it in the future.
+    log_msg = "UNABLE TO DETERMINE INVITE USED.\n Stored invites: {}, Current invites: {} \n" \
+              "Server: {}, Member: {}".format(stored_invites, current_invites, repr(member.guild), repr(member))
+    logging.info(log_msg)
+
+    if 'error_log_channel' not in config:
+        await update_invite_cache(member.guild, invites=current_invites)
+        return None
+    error_log_channel = client.get_channel(config['error_log_channel'])
+    await error_log_channel.send(log_msg)
+
+    await update_invite_cache(member.guild, invites=current_invites)
+    return None
 
 
 @client.event
 async def on_member_join(member: discord.Member):
 
-    embed = embeds.member_join(member)
-    log_channel = await get_guild_logging_channel(member.guild.id)  # TODO: DO something to prevent DMs which don't have a guild ID
+    if member.guild.me.guild_permissions.manage_guild:
+        invite_used = await find_used_invite(member)
+        if invite_used is not None:
+            logging.info(
+                "New user joined with link {} that has {} uses.".format(invite_used.invite_id, invite_used.uses))
+        embed = embeds.member_join(member, invite_used)
+    else:
+        embed = embeds.member_join(member, None, manage_guild=False)
+
+    log_channel = await get_guild_logging_channel(member.guild.id)
     if log_channel is None:
         # Silently fail if no log channel is configured.
         return
@@ -544,11 +692,10 @@ async def on_member_join(member: discord.Member):
 async def on_member_remove(member: discord.Member):
 
     embed = embeds.member_leave(member)
-    log_channel = await get_guild_logging_channel(member.guild.id)  # TODO: DO something to prevent DMS which don't have a guild ID
+    log_channel = await get_guild_logging_channel(member.guild.id)
     if log_channel is None:
         # Silently fail if no log channel is configured.
         return
-
     await log_channel.send(embed=embed)
 
 
@@ -567,7 +714,7 @@ async def on_member_update(before: discord.Member, after: discord.Member):
     if before.nick != after.nick:
         print("<@{}> ({}#{}) changed their name from {} to {}".format(after.id, after.name, after.discriminator, before.nick, after.nick))
 
-        log_channel = await get_guild_logging_channel(after.guild.id)  # TODO: DO something to prevent DMs which don't have a guild ID
+        log_channel = await get_guild_logging_channel(after.guild.id)
         if log_channel is None:
             # Silently fail if no log channel is configured.
             return
@@ -582,6 +729,8 @@ async def on_guild_join(guild: discord.Guild):
     #  Having it here is fragile as a user could add the bot and on_guild_join may not ever fire if the bot is down at the time.
     # create an entry for the server in the database
     await db.add_server(pool, guild.id, guild.name)
+
+    await update_invite_cache(guild)
 
     # Log it for support and DB debugging purposes
     log_msg = "Gabby Gums joined **{} ({})**, owned by:** {} - {}#{} ({})**".format(guild.name, guild.id, guild.owner.display_name, guild.owner.name, guild.owner.discriminator, guild.owner.id)
