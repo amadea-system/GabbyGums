@@ -4,6 +4,9 @@
 
 import discord
 from datetime import datetime
+from typing import Optional, Union
+
+from db import StoredInvite
 
 # TODO: Make these all async?
 
@@ -121,7 +124,7 @@ def unknown_deleted_message(channel_id, message_id) -> discord.Embed:
     return embed
 
 
-def member_join(member: discord.Member) -> discord.Embed:
+def member_join(member: discord.Member, invite: Optional[StoredInvite], manage_guild=True) -> discord.Embed:
     embed = discord.Embed(description="<@!{}> - {}#{}".format(member.id, member.name, member.discriminator),
                           color=0x00ff00, timestamp=datetime.utcnow())
 
@@ -134,7 +137,43 @@ def member_join(member: discord.Member) -> discord.Embed:
                     inline=False)
     account_age = datetime.utcnow() - member.created_at
     embed.add_field(name="Account Age", value="**{}** days old".format(account_age.days), inline=True)
-    embed.add_field(name="Invite Used", value="Coming soon!", inline=True)
+    embed.add_field(name="Current Member Count", value="**{}** Members".format(member.guild.member_count))
+
+    if invite is not None:
+        embed.add_field(name=" ‌‌‌", value="\n__**Invite Information**__", inline=False)
+
+        if invite.invite_name is not None:
+            embed.add_field(name="Name:", value="{}".format(invite.invite_name))
+
+        if invite.invite_id is not None:
+            embed.add_field(name="Code", value="{}".format(invite.invite_id))
+
+        if invite.actual_invite is not None:
+            embed.add_field(name="Uses", value="{}".format(invite.actual_invite.uses))
+            embed.add_field(name="Created By", value="<@!{}> - {}#{}".format(invite.actual_invite.inviter.id,
+                                                                             invite.actual_invite.inviter.name,
+                                                                             invite.actual_invite.inviter.discriminator))
+    else:
+        if not manage_guild:
+            embed.add_field(name="Permissions Warning!",
+                            value="**Manage Server Permissions** needed for invite tracking.")
+        elif member.bot:
+            embed.add_field(name=" ‌‌‌", value="\n__**Invite Information**__", inline=False)
+            embed.add_field(name="Code", value="Bot OAuth Link")
+        else:
+            embed.add_field(name="__**Invite Information**__",
+                            value="Unable to determine invite information due to an unknown error!", inline=False)
+
+
+    # invite_used_value = "Unknown"
+    # if invite is not None:
+    #     invite_uses = " with **{}** uses".format(invite.uses) if invite.uses > 0 else ""
+    #     if invite.invite_name is not None:
+    #         invite_used_value = "**{}**(**{}**){}".format(invite.invite_name, invite.invite_id, invite_uses)
+    #     else:
+    #         invite_used_value = "**{}**{}".format(invite.invite_id, invite_uses)
+
+    # embed.add_field(name="Invite Used", value=invite_used_value, inline=True)
     embed.set_footer(text="User ID: {}".format(member.id))
 
     return embed
