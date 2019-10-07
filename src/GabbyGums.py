@@ -242,10 +242,17 @@ async def _list_invites(ctx):
         invites: db.StoredInvites = await get_stored_invites(ctx.guild.id)
         embed = discord.Embed(title="Current Invites", color=0x9932CC)
 
+        embed_count = 0
         for invite in invites.invites:
             embed.add_field(name=invite.invite_id,
                             value="Uses: {}\n Nickname: {}".format(invite.uses, invite.invite_name))
-        await ctx.send(embed=embed)
+            embed_count += 1
+            if embed_count == 25:
+                await ctx.send(embed=embed)
+                embed = discord.Embed(title="Current Invites Cont.", color=0x9932CC)
+
+        if embed_count % 25 != 0:
+            await ctx.send(embed=embed)
 
 
 @invite_manage.command(name="name", brief="Lets you give an invite a nickname so it can be easier to identify.",
