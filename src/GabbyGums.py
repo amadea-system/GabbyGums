@@ -81,6 +81,7 @@ async def on_ready():
         await update_invite_cache(guild)
 
 
+
 # ----- Help & About Commands ----- #
 @client.command(name="Help", hidden=True)
 async def _help(ctx, *args):
@@ -588,19 +589,29 @@ async def get_stored_invites(guild_id: int) -> db.StoredInvites:
 
 async def update_invite_cache(guild: discord.Guild, invites: Optional[List[discord.Invite]] = None,
                               stored_invites: Optional[db.StoredInvites] = None):
-    if not guild.me.guild_permissions.manage_guild:
-        return
+    try:
+        if not guild.me.guild_permissions.manage_guild:
+            return
 
-    if invites is None:
-        invites: List[discord.Invite] = await guild.invites()
+        if invites is None:
+            invites: List[discord.Invite] = await guild.invites()
 
-    for invite in invites:
-        await db.store_invite(pool, guild.id, invite.id, invite.uses)
+        for invite in invites:
+            await db.store_invite(pool, guild.id, invite.id, invite.uses)
 
-    if stored_invites is None:
-        stored_invites = await get_stored_invites(guild.id)
+        if stored_invites is None:
+            stored_invites = await get_stored_invites(guild.id)
 
-    await remove_invalid_invites(guild.id, invites, stored_invites)
+        await remove_invalid_invites(guild.id, invites, stored_invites)
+    except discord.Forbidden as e:
+        logging.exception("update_invite_cache error: {}".format(e))
+
+        if 'error_log_channel' not in config:
+            return
+        error_log_channel = client.get_channel(config['error_log_channel'])
+        await error_log_channel.send(e)
+
+
 
 
 async def remove_invalid_invites(guild_id: int, current_invites: List[discord.Invite], stored_invites: Optional[db.StoredInvites]):
