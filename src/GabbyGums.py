@@ -619,8 +619,6 @@ async def update_invite_cache(guild: discord.Guild, invites: Optional[List[disco
         await error_log_channel.send(e)
 
 
-
-
 async def remove_invalid_invites(guild_id: int, current_invites: List[discord.Invite], stored_invites: Optional[db.StoredInvites]):
 
     def search_for_invite(_current_invites: List[discord.Invite], invite_id):
@@ -666,7 +664,7 @@ async def find_used_invite(member: discord.Member) -> Optional[db.StoredInvite]:
         if new_invite.uses > 0:
             # Todo: FIX! This works, unless we somehow missed the last user join.
             invite_used = db.StoredInvite(server_id=new_invite.guild.id, invite_id=new_invite.id,
-                                          uses=new_invite.uses, invite_name="New Invite!")
+                                          uses=new_invite.uses, invite_name="New Invite!", actual_invite=new_invite)
             await update_invite_cache(member.guild, invites=current_invites)
             return invite_used
 
