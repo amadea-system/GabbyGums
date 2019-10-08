@@ -153,6 +153,9 @@ def member_join(member: discord.Member, invite: Optional[StoredInvite], manage_g
             embed.add_field(name="Created By", value="<@!{}> - {}#{}".format(invite.actual_invite.inviter.id,
                                                                              invite.actual_invite.inviter.name,
                                                                              invite.actual_invite.inviter.discriminator))
+
+            embed.add_field(name="Created on",
+                            value=invite.actual_invite.created_at.strftime("%b %d, %Y, %I:%M:%S %p UTC"))
     else:
         if not manage_guild:
             embed.add_field(name="Permissions Warning!",
