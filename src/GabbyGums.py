@@ -81,7 +81,6 @@ async def on_ready():
         await update_invite_cache(guild)
 
 
-
 # ----- Help & About Commands ----- #
 @client.command(name="Help", hidden=True)
 async def _help(ctx, *args):
@@ -516,10 +515,13 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
             return
 
         # Ensure message was not proxied by PluralKit.
-        async with aiohttp.ClientSession() as session:
-            async with session.get('https://api.pluralkit.me/msg/{}'.format(payload.cached_message.id)) as r:
-                if r.status == 200:
-                    return  # Message was proxied by PluralKit. Return instead of logging message
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get('https://api.pluralkit.me/msg/{}'.format(payload.cached_message.id)) as r:
+                    if r.status == 200:
+                        return  # Message was proxied by PluralKit. Return instead of logging message
+        except aiohttp.ClientError as e:
+            logging.warning("Could not connect to PK server with out errors. Assuming message should be logged.\n{}".format(e))
 
         # Needed for embeds with out text. Consider locally cacheing images so we can post those to the log.
         if msg == "":
