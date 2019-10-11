@@ -543,7 +543,7 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
 @client.event
 async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
 
-    if 'content' in payload.data:
+    if 'content' in payload.data and payload.data['content'] != '':  # Makes sure there is a message content
         if "guild_id" not in payload.data:
             return  # We are in a DM, Don't log the message
 
