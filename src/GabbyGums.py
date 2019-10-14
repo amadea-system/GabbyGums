@@ -434,7 +434,7 @@ async def dump(ctx, table: str):
     for row in rows:
         table_msg = table_msg + str(row) + "\n"
     table_msg = table_msg + "```"
-    await ctx.send(table_msg[0:2000] if len(table_msg) > 2000 else table_msg)
+    await ctx.send(table_msg[len(table_msg)-2000:len(table_msg)] if len(table_msg) > 2000 else table_msg)
 
 
 @commands.is_owner()
@@ -468,16 +468,29 @@ async def on_command_error(ctx, error):
 @client.event
 async def on_message(message: discord.Message):
 
-    if len(message.attachments) > 0 and message.author.id != client.user.id:
+    if message.author.id != client.user.id:  # Don't log our own messages.
 
-        logging.info("# of attachments {}".format(len(message.attachments)))
-        for attachment in message.attachments:
-            logging.info("ID: {}, Filename: {}, Height: {}, width: {}, Size: {}, Proxy URL: {}, URL: {}".format(attachment.id, attachment.filename, attachment.height, attachment.width, attachment.size, attachment.proxy_url, attachment.url))
-            await attachment.save("./image_cache/" + str(attachment.id) + "_" + attachment.filename)
+        message_contents = message.content if message.content != '' else None
+        attachment = message.attachments[0] if len(message.attachments) > 0 else None
+        attachment_name = None
+
+        if len(message.attachments) > 0:
+            attachment = message.attachments[0]
+            attachment_name = "{}_{}".format(attachment.id, attachment.filename)
+            logging.info("Saving Attachment")
+            await attachment.save("./image_cache/" + attachment_name)
+
+        await db.cache_message(pool, message.guild.id, message.id, message.author.id, message_content=message_contents,
+                               attachment_name=attachment_name)
+
+        # logging.info("# of attachments {}".format(len(message.attachments)))
+
+        # for attachment in message.attachments:
+        #     logging.info("ID: {}, Filename: {}, Height: {}, width: {}, Size: {}, Proxy URL: {}, URL: {}".format(attachment.id, attachment.filename, attachment.height, attachment.width, attachment.size, attachment.proxy_url, attachment.url))
+            # await attachment.save("./image_cache/" + str(attachment.id) + "_" + attachment.filename)
             # await asyncio.sleep(0.5)
-            new_attach = discord.File("./image_cache/" + str(attachment.id) + "_" + attachment.filename, filename=attachment.filename)
-            await message.channel.send(file=new_attach)
-
+            # new_attach = discord.File("./image_cache/" + str(attachment.id) + "_" + attachment.filename, filename=attachment.filename)
+            # await message.channel.send(file=new_attach)
     await client.process_commands(message)
 
 
@@ -554,6 +567,17 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
 
         embed = embeds.unknown_deleted_message(channel_id, message_id)
         await log_channel.send(embed=embed)
+
+    cached_message = await db.get_cached_message(pool, payload.guild_id, payload.message_id)
+    if cached_message is not None and cached_message.attachment_name is not None:
+        spoil = True if "SPOILER" in cached_message.attachment_name else False
+        if spoil is False:
+            channel = await get_channel_safe(payload.channel_id)
+            if channel.is_nsfw():
+                spoil = True  # Make ALL NSFW images spoiled.
+
+        new_attach = discord.File("./image_cache/" + cached_message.attachment_name, filename=cached_message.attachment_name, spoiler=spoil)
+        await log_channel.send(file=new_attach)
 
 
 @client.event
