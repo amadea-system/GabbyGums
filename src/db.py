@@ -13,7 +13,7 @@ import time
 
 import asyncio
 import asyncpg
-from discord import Invite
+from discord import Invite, Message
 
 
 async def create_db_pool(uri: str) -> asyncpg.pool.Pool:
@@ -157,6 +157,7 @@ async def update_invite_name(pool, sid: int, invite_id: str, invite_name: Option
     async with pool.acquire() as conn:
         await conn.execute("UPDATE invites SET invite_name = $1 WHERE server_id = $2 AND invite_id = $3", invite_name, sid, invite_id)
 
+
 @db_deco
 async def remove_invite(pool, sid, invite_id):
     async with pool.acquire() as conn:
@@ -192,6 +193,12 @@ async def get_invites(pool, sid: int) -> StoredInvites:
         raw_rows = await conn.fetch('SELECT * FROM invites WHERE server_id = $1', sid)
         #Fixme: Does fetch return None or 0 length list when no entries are found?
         return StoredInvites(invites=[StoredInvite(**row) for row in raw_rows])
+
+
+@db_deco
+async def cache_message(pool, sid: int, message_id: int, author_id: int, message_content=None, attachment_name=None):
+    async with pool.acquire() as conn:
+        await conn.execute("INSERT INTO invites(server_id, message_id, user_id, content, attachment_name) VALUES($1, $2, $3, $4, $5)", sid, message_id, author_id, message_content, attachment_name)
 
 
 @db_deco
@@ -256,6 +263,17 @@ async def create_tables(pool):
                                name         TEXT,
                                discriminator SMALLINT,
                                nickname     TEXT
+                           )
+                       ''')
+
+        # Create message cache table
+        await conn.execute('''
+                           CREATE TABLE if not exists messages(
+                               message_id   BIGINT PRIMARY KEY,
+                               server_id    BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
+                               user_id      BIGINT NOT NULL,
+                               content      TEXT DEFAULT NULL,
+                               attachment_name TEXT DEFAULT NULL
                            )
                        ''')
 

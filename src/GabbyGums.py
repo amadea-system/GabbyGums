@@ -466,6 +466,22 @@ async def on_command_error(ctx, error):
 
 # ----- Discord Events ----- #
 @client.event
+async def on_message(message: discord.Message):
+
+    if len(message.attachments) > 0 and message.author.id != client.user.id:
+
+        logging.info("# of attachments {}".format(len(message.attachments)))
+        for attachment in message.attachments:
+            logging.info("ID: {}, Filename: {}, Height: {}, width: {}, Size: {}, Proxy URL: {}, URL: {}".format(attachment.id, attachment.filename, attachment.height, attachment.width, attachment.size, attachment.proxy_url, attachment.url))
+            await attachment.save("./image_cache/" + str(attachment.id) + "_" + attachment.filename)
+            # await asyncio.sleep(0.5)
+            new_attach = discord.File("./image_cache/" + str(attachment.id) + "_" + attachment.filename, filename=attachment.filename)
+            await message.channel.send(file=new_attach)
+
+    await client.process_commands(message)
+
+
+@client.event
 async def on_error(event_name, *args):
     logging.exception("Exception from event {}".format(event_name))
 
