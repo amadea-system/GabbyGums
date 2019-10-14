@@ -672,15 +672,30 @@ async def find_used_invite(member: discord.Member) -> Optional[db.StoredInvite]:
 
     # Somehow we STILL haven't found the invite that was used... I don't think we should ever get here, unless I forgot something...
     # We should never get here, so log it very verbosly in case we do so I can avoid it in the future.
+    current_invite_debug_msg = "invites=["
+    for invite in current_invites:
+        debug_msg = "Invite(code={code}, uses={uses}, max_uses={max_uses}, max_age={max_age}, revoked={revoked}," \
+              " created_at={created_at}, inviter={inviter}, guild={guild})".format(code=invite.code, uses=invite.uses,
+                                                                                   max_uses=invite.max_uses,
+                                                                                   max_age=invite.max_age,
+                                                                                   revoked=invite.revoked,
+                                                                                   created_at=invite.created_at,
+                                                                                   inviter=invite.inviter,
+                                                                                   guild=invite.guild)
+        current_invite_debug_msg = current_invite_debug_msg + debug_msg
+    current_invite_debug_msg = current_invite_debug_msg + "]"
+
     log_msg = "UNABLE TO DETERMINE INVITE USED.\n Stored invites: {}, Current invites: {} \n" \
-              "Server: {}, Member: {}".format(stored_invites, current_invites, repr(member.guild), repr(member))
+              "Server: {}, Member: {}".format(stored_invites, current_invite_debug_msg, repr(member.guild), repr(member))
     logging.info(log_msg)
 
-    if 'error_log_channel' not in config:
-        await update_invite_cache(member.guild, invites=current_invites)
-        return None
-    error_log_channel = client.get_channel(config['error_log_channel'])
-    await error_log_channel.send(log_msg)
+    if 'error_log_channel' in config:
+        error_log_channel = client.get_channel(config['error_log_channel'])
+        await error_log_channel.send("UNABLE TO DETERMINE INVITE USED.")
+        await error_log_channel.send("Stored invites: {}".format(stored_invites))
+        await error_log_channel.send("Current invites: {}".format(current_invite_debug_msg))
+        await error_log_channel.send("Server: {}".format(repr(member.guild)))
+        await error_log_channel.send("Member who joined: {}".format(repr(member)))
 
     await update_invite_cache(member.guild, invites=current_invites)
     return None
