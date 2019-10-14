@@ -195,10 +195,27 @@ async def get_invites(pool, sid: int) -> StoredInvites:
         return StoredInvites(invites=[StoredInvite(**row) for row in raw_rows])
 
 
+@dataclass
+class CachedMessage:
+    message_id: int
+    server_id: int
+    user_id: int
+    content: Optional[str]
+    attachment_name: Optional[str]
+
+
 @db_deco
 async def cache_message(pool, sid: int, message_id: int, author_id: int, message_content=None, attachment_name=None):
     async with pool.acquire() as conn:
-        await conn.execute("INSERT INTO invites(server_id, message_id, user_id, content, attachment_name) VALUES($1, $2, $3, $4, $5)", sid, message_id, author_id, message_content, attachment_name)
+        await conn.execute("INSERT INTO messages(server_id, message_id, user_id, content, attachment_name, ts) VALUES($1, $2, $3, $4, $5, NOW())", sid, message_id, author_id, message_content, attachment_name)
+
+
+@db_deco
+async def get_cached_message(pool, sid: int, message_id: int):
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT * FROM messages WHERE message_id = $1", message_id)
+        return CachedMessage(**row) if row is not None else None
+
 
 
 @db_deco
@@ -273,7 +290,8 @@ async def create_tables(pool):
                                server_id    BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
                                user_id      BIGINT NOT NULL,
                                content      TEXT DEFAULT NULL,
-                               attachment_name TEXT DEFAULT NULL
+                               attachment_name TEXT DEFAULT NULL,
+                               ts              TIMESTAMPTZ
                            )
                        ''')
 
