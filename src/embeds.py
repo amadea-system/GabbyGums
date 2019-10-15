@@ -82,34 +82,38 @@ def edited_message(author_id, author_name: str, author_discrim, channel_id, befo
     return embed
 
 
-def deleted_message(message_content: str, author: discord.Member, channel: discord.TextChannel) -> discord.Embed:
+def deleted_message(message_content: str, author: discord.Member, channel_id: int, message_id: int = -1,
+                    cached: bool = True) -> discord.Embed:
 
-    if author.discriminator == "0000":
-        description_text = "{}#{}".format(author.name, author.discriminator)
-        info_author = "{}#{}".format(author.name, author.discriminator)
+    if cached:
+        if author.discriminator == "0000":
+            description_text = "{}#{}".format(author.name, author.discriminator)
+            info_author = "{}#{}".format(author.name, author.discriminator)
+        else:
+            description_text = "<@{}> - {}#{}".format(author.id, author.name, author.discriminator)
+            info_author = "<@{}>".format(author.id)
+
+        embed = discord.Embed(title="Deleted Message",
+                              description=description_text,
+                              color=0x9b59b6,
+                              timestamp=datetime.utcnow())
+        embed.set_thumbnail(url="http://i.imgur.com/fJpAFgN.png")
+        embed.add_field(name="Info:",
+                        value="A message by {}, was deleted in <#{}>".format(info_author, channel_id),
+                        inline=False)
+
+        if len(message_content) > 1024:
+            msg_cont_1, msg_cont_2 = split_message(message_content)
+            embed.add_field(name="Message:", value=msg_cont_1, inline=False)
+            embed.add_field(name="Message continued:", value=msg_cont_2, inline=False)
+        else:
+            embed.add_field(name="Message:", value=message_content, inline=False)
+
+        embed.set_footer(text="User ID: {}".format(author.id))
+
+        return embed
     else:
-        description_text = "<@{}> - {}#{}".format(author.id, author.name, author.discriminator)
-        info_author = "<@{}>".format(author.id)
-
-    embed = discord.Embed(title="Deleted Message",
-                          description=description_text,
-                          color=0x9b59b6,
-                          timestamp=datetime.utcnow())
-    embed.set_thumbnail(url="http://i.imgur.com/fJpAFgN.png")
-    embed.add_field(name="Info:",
-                    value="A message by {}, was deleted in <#{}>".format(info_author, channel.id),
-                    inline=False)
-
-    if len(message_content) > 1024:
-        msg_cont_1, msg_cont_2 = split_message(message_content)
-        embed.add_field(name="Message:", value=msg_cont_1, inline=False)
-        embed.add_field(name="Message continued:", value=msg_cont_2, inline=False)
-    else:
-        embed.add_field(name="Message:", value=message_content, inline=False)
-
-    embed.set_footer(text="User ID: {}".format(author.id))
-
-    return embed
+        return unknown_deleted_message(channel_id, message_id)
 
 
 def unknown_deleted_message(channel_id, message_id) -> discord.Embed:

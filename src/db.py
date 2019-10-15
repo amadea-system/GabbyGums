@@ -9,6 +9,7 @@ import functools
 from dataclasses import dataclass, field
 from typing import List, Optional
 import time
+from datetime import datetime
 
 
 import asyncio
@@ -200,22 +201,35 @@ class CachedMessage:
     message_id: int
     server_id: int
     user_id: int
+    ts: datetime
     content: Optional[str]
-    attachment_name: Optional[str]
+    attachments: Optional[List[str]]
 
 
 @db_deco
-async def cache_message(pool, sid: int, message_id: int, author_id: int, message_content=None, attachment_name=None):
+async def cache_message(pool, sid: int, message_id: int, author_id: int, message_content: Optional[str] = None,
+                        attachments: Optional[List[str]] = None):
     async with pool.acquire() as conn:
-        await conn.execute("INSERT INTO messages(server_id, message_id, user_id, content, attachment_name, ts) VALUES($1, $2, $3, $4, $5, NOW())", sid, message_id, author_id, message_content, attachment_name)
+        await conn.execute("INSERT INTO messages(server_id, message_id, user_id, content, attachments) VALUES($1, $2, $3, $4, $5)", sid, message_id, author_id, message_content, attachments)
 
 
 @db_deco
-async def get_cached_message(pool, sid: int, message_id: int):
+async def get_cached_message(pool, sid: int, message_id: int) -> CachedMessage:
     async with pool.acquire() as conn:
         row = await conn.fetchrow("SELECT * FROM messages WHERE message_id = $1", message_id)
         return CachedMessage(**row) if row is not None else None
 
+
+@db_deco
+async def update_cached_message(pool, sid: int, message_id: int, new_content: str):
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE messages SET content = $1 WHERE message_id = $2", new_content, message_id)
+
+
+@db_deco
+async def delete_cached_message(pool, sid: int, message_id: int):
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM messages WHERE message_id = $1", message_id)
 
 
 @db_deco
@@ -230,9 +244,9 @@ async def create_tables(pool):
     async with pool.acquire() as conn:
         await conn.execute('''
                            CREATE TABLE if not exists servers(
-                               server_id BIGINT PRIMARY KEY,
-                               server_name TEXT,
-                               log_channel_id BIGINT,
+                               server_id       BIGINT PRIMARY KEY,
+                               server_name     TEXT,
+                               log_channel_id  BIGINT,
                                logging_enabled BOOLEAN NOT NULL DEFAULT TRUE
                            )
                        ''')
@@ -240,8 +254,8 @@ async def create_tables(pool):
         # Create ignored_channels table
         await conn.execute('''
                            CREATE TABLE if not exists ignored_channels(
-                                id SERIAL PRIMARY KEY,
-                                server_id BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
+                                id         SERIAL PRIMARY KEY,
+                                server_id  BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
                                 channel_id BIGINT NOT NULL,
                                 UNIQUE (server_id, channel_id)
                            )
@@ -274,12 +288,12 @@ async def create_tables(pool):
         # Create username_tracking table
         await conn.execute('''
                            CREATE TABLE if not exists past_names(
-                               id           SERIAL PRIMARY KEY,
-                               server_id    BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
-                               user_id      BIGINT NOT NULL,
-                               name         TEXT,
+                               id            SERIAL PRIMARY KEY,
+                               server_id     BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
+                               user_id       BIGINT NOT NULL,
+                               name          TEXT,
                                discriminator SMALLINT,
-                               nickname     TEXT
+                               nickname      TEXT
                            )
                        ''')
 
@@ -290,8 +304,8 @@ async def create_tables(pool):
                                server_id    BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
                                user_id      BIGINT NOT NULL,
                                content      TEXT DEFAULT NULL,
-                               attachment_name TEXT DEFAULT NULL,
-                               ts              TIMESTAMPTZ
+                               attachments  TEXT[] DEFAULT NULL,
+                               ts           TIMESTAMPTZ NOT NULL DEFAULT NOW()
                            )
                        ''')
 
