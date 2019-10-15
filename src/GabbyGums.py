@@ -2,10 +2,6 @@
 
 '''
 
-
-
-
-
 import time
 import json
 import os
@@ -527,29 +523,35 @@ async def on_error(event_name, *args):
 @client.event
 async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
 
+    async def cleanup_message_cache():
+        if db_cached_message is not None:
+            await db.delete_cached_message(pool, payload.guild_id, db_cached_message.message_id)
+
     if payload.guild_id is None:
         return  # We are in a DM, Don't log the message
+
+    #Get the cached msg from the DB (if possible)
+    db_cached_message = await db.get_cached_message(pool, payload.guild_id, payload.message_id)
 
     log_channel = await get_guild_logging_channel(payload.guild_id)
     if log_channel is None:
         # Silently fail if no log channel is configured.
+        await cleanup_message_cache()
         return
 
     if await is_channel_ignored(pool, payload.guild_id, payload.channel_id):
+        await cleanup_message_cache()
         return
 
     channel_id = payload.channel_id
-    cached_message = await db.get_cached_message(pool, payload.guild_id, payload.message_id)
 
-    if payload.cached_message is not None or cached_message is not None:
+    if payload.cached_message is not None or db_cached_message is not None:
         cache_exists = True
-        msg = payload.cached_message.content if payload.cached_message is not None else cached_message.content
-        author = payload.cached_message.author if payload.cached_message is not None else client.get_user(cached_message.user_id)
+        msg = payload.cached_message.content if payload.cached_message is not None else db_cached_message.content
+        author = payload.cached_message.author if payload.cached_message is not None else client.get_user(db_cached_message.user_id)
 
-        if client.user.id == author.id:
-            return  # This is a Gabby Gums message. Do not log the event.
-
-        if await is_user_ignored(pool, payload.guild_id, author.id):
+        if client.user.id == author.id or await is_user_ignored(pool, payload.guild_id, author.id):
+            await cleanup_message_cache()
             return
     else:
         cache_exists = False
@@ -561,6 +563,7 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
         async with aiohttp.ClientSession() as session:
             async with session.get('https://api.pluralkit.me/msg/{}'.format(payload.message_id)) as r:
                 if r.status == 200:
+                    await cleanup_message_cache()
                     return  # Message was proxied by PluralKit. Return instead of logging message
     except aiohttp.ClientError as e:
         logging.warning(
@@ -568,18 +571,19 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
 
     # Handle any attachments
     attachments = []
-    if cached_message is not None and cached_message.attachments is not None:
-        for attachment_name in cached_message.attachments:
+    if db_cached_message is not None and db_cached_message.attachments is not None:
+        for attachment_name in db_cached_message.attachments:
             spoil = True if "SPOILER" in attachment_name else False
             if spoil is False:
                 channel = await get_channel_safe(payload.channel_id)
                 if channel.is_nsfw():
                     spoil = True  # Make ANY image from an NSFW board spoiled to keep log channels SFW.
             try:
-                new_attach = discord.File("./image_cache/{}/{}".format(cached_message.server_id, attachment_name),
+                # max file sizee 8000000
+                new_attach = discord.File("./image_cache/{}/{}".format(db_cached_message.server_id, attachment_name),
                                           filename=attachment_name, spoiler=spoil)
                 attachments.append(new_attach)
-            except FileNotFoundError as e:
+            except FileNotFoundError:
                 pass  # The file may have been too old and has since been deleted.
 
     if msg == "":
@@ -591,9 +595,7 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
     if len(attachments) > 0:
         await log_channel.send(content="Deleted Attachments:", files=attachments)
 
-    if cached_message is not None:
-        # No reason to hang onto a deleted message.
-        await db.delete_cached_message(pool, payload.guild_id, cached_message.message_id)
+    await cleanup_message_cache()
 
 
 @client.event
@@ -603,7 +605,7 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
         if "guild_id" not in payload.data:
             return  # We are in a DM, Don't log the message
 
-        cached_message = await db.get_cached_message(pool, payload.data['guild_id'], payload.message_id)
+        db_cached_message = await db.get_cached_message(pool, payload.data['guild_id'], payload.message_id)
 
         after_msg = payload.data['content']
         guild_id = int(payload.data["guild_id"])
@@ -615,7 +617,7 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
             author_id = author.id
             channel_id = payload.cached_message.channel.id
         else:
-            before_msg = cached_message.content if cached_message is not None else None
+            before_msg = db_cached_message.content if db_cached_message is not None else None
             author_id = payload.data['author']['id']
             channel_id = payload.data["channel_id"]
             author = None
@@ -648,7 +650,7 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
         # try:
         await log_channel.send(embed=embed)
 
-        if cached_message is not None:
+        if db_cached_message is not None:
             await db.update_cached_message(pool, payload.data['guild_id'], payload.message_id, after_msg)
 
 
