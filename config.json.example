@@ -2,5 +2,6 @@
   "token": "DISCORD BOT TOKEN",
   "error_log_channel": 111111111111111111,
   "bot_prefix": "BOT PREFIX!",
-  "db_uri": "UTI_TO_POSTGRES_DB"
+  "db_uri": "UTI_TO_POSTGRES_DB",
+  "restricted_features": [111111111111111111, 111111111111111111]
 }

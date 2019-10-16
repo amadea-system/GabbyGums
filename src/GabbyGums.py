@@ -2,22 +2,23 @@
 
 '''
 
-
-import discord
-from discord.ext import commands
-from discord.utils import oauth_url
-import aiohttp
 import time
-from typing import Optional, List
 import json
 import os
 import logging
 import traceback
-import embeds
+import asyncio
+from pathlib import Path
+from typing import Optional, List
+
 import psutil
 import asyncpg
-import asyncio
+import aiohttp
+import discord
+from discord.ext import commands
+from discord.utils import oauth_url
 
+import embeds
 import db
 
 
@@ -434,7 +435,7 @@ async def dump(ctx, table: str):
     for row in rows:
         table_msg = table_msg + str(row) + "\n"
     table_msg = table_msg + "```"
-    await ctx.send(table_msg[0:2000] if len(table_msg) > 2000 else table_msg)
+    await ctx.send(table_msg[len(table_msg)-2000:len(table_msg)] if len(table_msg) > 2000 else table_msg)
 
 
 @commands.is_owner()
@@ -466,6 +467,36 @@ async def on_command_error(ctx, error):
 
 # ----- Discord Events ----- #
 @client.event
+async def on_message(message: discord.Message):
+
+    if message.author.id != client.user.id:  # Don't log our own messages.
+
+        message_contents = message.content if message.content != '' else None
+
+        # TODO: Use Path Objects instead of strings for paths.
+        attachments = None
+        if len(message.attachments) > 0 and message.guild.id in config['restricted_features']:
+            attachments = []
+            for attachment in message.attachments:
+                # logging.info("ID: {}, Filename: {}, Height: {}, width: {}, Size: {}, Proxy URL: {}, URL: {}".format(attachment.id, attachment.filename, attachment.height, attachment.width, attachment.size, attachment.proxy_url, attachment.url))
+
+                attachment_filename = "{}_{}".format(attachment.id, attachment.filename)
+                logging.info("Saving Attachment from {}".format(message.guild.id))
+                try:
+                    await attachment.save("./image_cache/{}/{}".format(message.guild.id, attachment_filename))
+                except FileNotFoundError as e:
+                    # If the directory(s) do not exist, create them and then re-save
+                    Path("./image_cache/{}".format(message.guild.id)).mkdir(parents=True, exist_ok=True)
+                    await attachment.save("./image_cache/{}/{}".format(message.guild.id, attachment_filename))
+                attachments.append(attachment_filename)
+
+        await db.cache_message(pool, message.guild.id, message.id, message.author.id, message_content=message_contents,
+                               attachments=attachments)
+
+    await client.process_commands(message)
+
+
+@client.event
 async def on_error(event_name, *args):
     logging.exception("Exception from event {}".format(event_name))
 
@@ -492,52 +523,80 @@ async def on_error(event_name, *args):
 @client.event
 async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
 
+    async def cleanup_message_cache():
+        if db_cached_message is not None:
+            await db.delete_cached_message(pool, payload.guild_id, db_cached_message.message_id)
+
     if payload.guild_id is None:
         return  # We are in a DM, Don't log the message
+
+    #Get the cached msg from the DB (if possible)
+    db_cached_message = await db.get_cached_message(pool, payload.guild_id, payload.message_id)
 
     log_channel = await get_guild_logging_channel(payload.guild_id)
     if log_channel is None:
         # Silently fail if no log channel is configured.
+        await cleanup_message_cache()
         return
 
-    if payload.cached_message is not None:
-        msg = payload.cached_message.content
-        author = payload.cached_message.author
-        channel = payload.cached_message.channel
+    if await is_channel_ignored(pool, payload.guild_id, payload.channel_id):
+        await cleanup_message_cache()
+        return
 
-        if client.user.id == author.id:
-            return  # This is a Gabby Gums message. Do not log the event.
+    channel_id = payload.channel_id
 
-        if await is_user_ignored(pool, payload.guild_id, author.id):
+    if payload.cached_message is not None or db_cached_message is not None:
+        cache_exists = True
+        msg = payload.cached_message.content if payload.cached_message is not None else db_cached_message.content
+        author = payload.cached_message.author if payload.cached_message is not None else client.get_user(db_cached_message.user_id)
+
+        if client.user.id == author.id or await is_user_ignored(pool, payload.guild_id, author.id):
+            await cleanup_message_cache()
             return
-
-        if await is_channel_ignored(pool, payload.guild_id, payload.channel_id):
-            return
-
-        # Ensure message was not proxied by PluralKit.
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get('https://api.pluralkit.me/msg/{}'.format(payload.cached_message.id)) as r:
-                    if r.status == 200:
-                        return  # Message was proxied by PluralKit. Return instead of logging message
-        except aiohttp.ClientError as e:
-            logging.warning("Could not connect to PK server with out errors. Assuming message should be logged.\n{}".format(e))
-
-        # Needed for embeds with out text. Consider locally cacheing images so we can post those to the log.
-        if msg == "":
-            msg = "None"
-        embed = embeds.deleted_message(message_content=msg, author=author, channel=channel)
-        await log_channel.send(embed=embed)
-
     else:
-        message_id = payload.message_id
-        channel_id = payload.channel_id
+        cache_exists = False
+        msg = None
+        author = None
 
-        if await is_channel_ignored(pool, payload.guild_id, payload.channel_id):
-            return
+    # Check with PK API Last to reduce PK server load.
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get('https://api.pluralkit.me/msg/{}'.format(payload.message_id)) as r:
+                if r.status == 200:
+                    await cleanup_message_cache()
+                    return  # Message was proxied by PluralKit. Return instead of logging message
+    except aiohttp.ClientError as e:
+        logging.warning(
+            "Could not connect to PK server with out errors. Assuming message should be logged.\n{}".format(e))
 
-        embed = embeds.unknown_deleted_message(channel_id, message_id)
-        await log_channel.send(embed=embed)
+    # Handle any attachments
+    attachments = []
+    if db_cached_message is not None and db_cached_message.attachments is not None:
+        for attachment_name in db_cached_message.attachments:
+            spoil = True if "SPOILER" in attachment_name else False
+            if spoil is False:
+                channel = await get_channel_safe(payload.channel_id)
+                if channel.is_nsfw():
+                    spoil = True  # Make ANY image from an NSFW board spoiled to keep log channels SFW.
+            try:
+                # max file sizee 8000000
+                new_attach = discord.File("./image_cache/{}/{}".format(db_cached_message.server_id, attachment_name),
+                                          filename=attachment_name, spoiler=spoil)
+                attachments.append(new_attach)
+            except FileNotFoundError:
+                pass  # The file may have been too old and has since been deleted.
+
+
+    if msg == "":
+        msg = "None"
+
+    embed = embeds.deleted_message(message_content=msg, author=author, channel_id=channel_id,
+                                   message_id=payload.message_id, cached=cache_exists)
+    await log_channel.send(embed=embed)
+    if len(attachments) > 0:
+        await log_channel.send(content="Deleted Attachments:", files=attachments)
+
+    await cleanup_message_cache()
 
 
 @client.event
@@ -546,6 +605,8 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
     if 'content' in payload.data and payload.data['content'] != '':  # Makes sure there is a message content
         if "guild_id" not in payload.data:
             return  # We are in a DM, Don't log the message
+
+        db_cached_message = await db.get_cached_message(pool, payload.data['guild_id'], payload.message_id)
 
         after_msg = payload.data['content']
         guild_id = int(payload.data["guild_id"])
@@ -557,7 +618,7 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
             author_id = author.id
             channel_id = payload.cached_message.channel.id
         else:
-            before_msg = None
+            before_msg = db_cached_message.content if db_cached_message is not None else None
             author_id = payload.data['author']['id']
             channel_id = payload.data["channel_id"]
             author = None
@@ -589,6 +650,9 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
 
         # try:
         await log_channel.send(embed=embed)
+
+        if db_cached_message is not None:
+            await db.update_cached_message(pool, payload.data['guild_id'], payload.message_id, after_msg)
 
 
 async def get_stored_invites(guild_id: int) -> db.StoredInvites:

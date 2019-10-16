@@ -7,6 +7,7 @@ services:
       - GabbyGums.py
       volumes:
         - "./config.json:/app/config.json"
+        - "./image_cache/:/app/image_cache/"
       depends_on:
       - db
       restart: always
