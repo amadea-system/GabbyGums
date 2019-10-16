@@ -30,8 +30,10 @@ def db_deco(func):
         try:
             response = await func(*args, **kwargs)
             end_time = time.perf_counter()
-            logging.info("DB Query {} from {} in {:.3f} ms.".format(func.__name__, args[1], (end_time - start_time) * 1000))
-
+            if len(args) > 1:
+                logging.info("DB Query {} from {} in {:.3f} ms.".format(func.__name__, args[1], (end_time - start_time) * 1000))
+            else:
+                logging.info("DB Query {} in {:.3f} ms.".format(func.__name__, (end_time - start_time) * 1000))
             return response
         except asyncpg.exceptions.PostgresError:
             logging.exception("Error attempting database query: {} for server: {}".format(func.__name__, args[1]))
@@ -230,6 +232,13 @@ async def update_cached_message(pool, sid: int, message_id: int, new_content: st
 async def delete_cached_message(pool, sid: int, message_id: int):
     async with pool.acquire() as conn:
         await conn.execute("DELETE FROM messages WHERE message_id = $1", message_id)
+
+
+@db_deco
+async def get_number_of_rows_in_messages(pool, table: str = "messages") -> int:  # Slow! But only used for g!top so okay.
+    async with pool.acquire() as conn:
+        num_of_rows = await conn.fetchval("SELECT COUNT(*) FROM messages")
+        return num_of_rows
 
 
 @db_deco

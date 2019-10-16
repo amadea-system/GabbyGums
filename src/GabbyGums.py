@@ -300,7 +300,7 @@ async def ping_command(ctx):
     # Sends a message to the user in the channel the message with the command was received.
     # Notifies the user that pinging has started
     new_embed = discord.Embed(title="Pong!",
-                              description="Round trip messaging time: **{:.2f} ms**. \n API latency: **{:.2f} ms**.\n Database latency: **{:.2f} ms**".
+                              description="Round trip messaging time: **{:.2f} ms**. \nAPI latency: **{:.2f} ms**.\nDatabase latency: **{:.2f} ms**".
                              format((time.perf_counter() - start)*1000, client.latency*1000, (db_end - db_start)*1000), color=0x00b7fa)
     await msg.edit(embed=new_embed)
 
@@ -310,20 +310,36 @@ async def ping_command(ctx):
                 description='Shows CPU and memory usage.')
 async def top_command(ctx):
 
+    def folder_size(path='.'):
+        total = 0
+        for entry in os.scandir(path):
+            if entry.is_file():
+                total += entry.stat().st_size
+            elif entry.is_dir():
+                total += folder_size(entry.path)
+        return total
+
     pid = os.getpid()
     py = psutil.Process(pid)
     memory_use = py.memory_info()[0] / 1024 / 1024
+    disk_usage = psutil.disk_usage("/")
+    disk_space_free = disk_usage.free / 1024 / 1024
+    disk_space_used = disk_usage.used / 1024 / 1024
+    disk_space_percent_used = disk_usage.percent
+    image_cache_du_used = folder_size("./image_cache/") / 1024 / 1024
+    num_of_files_in_cache = sum([len(files) for r, d, files in os.walk("./image_cache/")])
 
+    num_of_db_cached_messages = await db.get_number_of_rows_in_messages(pool)
     try:
         load_average = os.getloadavg()
     except AttributeError:  # Get load avg is not available on windows
         load_average = [-1, -1, -1]
 
     embed = discord.Embed(title="CPU and memory usage:",
-                          description="CPU: **{}%** \nLoad average: **{:.2f}, {:.2f}, {:.2f}**\n Memory: **{:.2f} MB**"
-                                      "\n Cached messages: **{}**\n Guilds in: **{}**".
-                          format(psutil.cpu_percent(), load_average[0], load_average[1], load_average[2],
-                                 memory_use, len(client.cached_messages), len(client.guilds)), color=0x00b7fa)
+                          description="CPU: **{}%** \nLoad average: **{:.2f}, {:.2f}, {:.2f}**\nMemory: **{:.2f} MB**"
+                                      "\nDisk space: **{:.2f} MB Free**, **{:.2f} MB Used**, **{}% Used**\nDisk spaced used by image cache: **{:.2f} MB Used** with **{} files** \nCached messages in DB: **{}**\nCached messages in memory: **{}**\n# of guilds: **{}**".
+                          format(psutil.cpu_percent(), load_average[0], load_average[1], load_average[2], memory_use,
+                                 disk_space_free, disk_space_used, disk_space_percent_used, image_cache_du_used, num_of_files_in_cache, num_of_db_cached_messages, len(client.cached_messages), len(client.guilds)), color=0x00b7fa)
 
     await ctx.send(embed=embed)
 
@@ -478,7 +494,8 @@ async def on_message(message: discord.Message):
         if len(message.attachments) > 0 and message.guild.id in config['restricted_features']:
             attachments = []
             for attachment in message.attachments:
-                # logging.info("ID: {}, Filename: {}, Height: {}, width: {}, Size: {}, Proxy URL: {}, URL: {}".format(attachment.id, attachment.filename, attachment.height, attachment.width, attachment.size, attachment.proxy_url, attachment.url))
+                # logging.info("ID: {}, Filename: {}, Height: {}, width: {}, Size: {}, Proxy URL: {}, URL: {}"
+                #              .format(attachment.id, attachment.filename, attachment.height, attachment.width, attachment.size, attachment.proxy_url, attachment.url))
 
                 attachment_filename = "{}_{}".format(attachment.id, attachment.filename)
                 logging.info("Saving Attachment from {}".format(message.guild.id))
