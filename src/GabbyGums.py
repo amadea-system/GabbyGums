@@ -507,8 +507,9 @@ async def on_message(message: discord.Message):
                     await attachment.save("./image_cache/{}/{}".format(message.guild.id, attachment_filename))
                 attachments.append(attachment_filename)
 
-        await db.cache_message(pool, message.guild.id, message.id, message.author.id, message_content=message_contents,
-                               attachments=attachments)
+        if message_contents is not None or attachments is not None:
+            await db.cache_message(pool, message.guild.id, message.id, message.author.id, message_content=message_contents,
+                                   attachments=attachments)
 
     await client.process_commands(message)
 
