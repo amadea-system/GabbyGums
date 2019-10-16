@@ -586,6 +586,7 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
             except FileNotFoundError:
                 pass  # The file may have been too old and has since been deleted.
 
+
     if msg == "":
         msg = "None"
 
