@@ -306,15 +306,16 @@ async def create_tables(pool):
                               )
                           ''')
 
-        # Create username_tracking table
+        # Create users table
         await conn.execute('''
-                           CREATE TABLE if not exists past_names(
-                               id            SERIAL PRIMARY KEY,
+                           CREATE TABLE if not exists users(
+                               user_id       BIGINT PRIMARY KEY,
                                server_id     BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
-                               user_id       BIGINT NOT NULL,
-                               name          TEXT,
+                               username      TEXT,
                                discriminator SMALLINT,
-                               nickname      TEXT
+                               nickname      TEXT,
+                               is_webhook    BOOL DEFAULT FALSE
+                               UNIQUE (user_id, server_id)
                            )
                        ''')
 
