@@ -455,6 +455,20 @@ async def dump(ctx, table: str):
 
 
 @commands.is_owner()
+@client.command(name="messages")
+async def past_messages(ctx, hours: int, max: int = 15):
+    # This command is limited only to servers that we are Admin/Owner of for privacy reasons.
+    rows = await db.get_cached_messages_older_than(pool, hours)
+    rows = rows[len(rows)-max:len(rows)] if len(rows) > max else rows
+    await ctx.send("Dumping the last {} records over the last {} hours".format(len(rows), hours))
+    for row in rows:
+        log_msg = "mid: {}, sid: {}, uid: {}, ts: {}, message: \n**{}**".format(row['message_id'], row['server_id'], row['user_id'], row['ts'].strftime("%b %d, %Y, %I:%M:%S %p UTC"), row['content'])
+        logging.info(log_msg)
+        await ctx.send(log_msg)
+        await asyncio.sleep(1)
+
+
+@commands.is_owner()
 @client.command(name="test")
 async def test_cmd(ctx):
     pass

@@ -9,7 +9,7 @@ import functools
 from dataclasses import dataclass, field
 from typing import List, Optional
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 import asyncio
@@ -239,6 +239,18 @@ async def get_number_of_rows_in_messages(pool, table: str = "messages") -> int: 
     async with pool.acquire() as conn:
         num_of_rows = await conn.fetchval("SELECT COUNT(*) FROM messages")
         return num_of_rows
+
+
+@db_deco
+async def get_cached_messages_older_than(pool, hours: int):
+    # This command is limited only to servers that we are Admin/Owner of for privacy reasons.
+    # Servers: GGB, PN, AS
+    async with pool.acquire() as conn:
+        now = datetime.now()
+        offset = timedelta(hours=hours)
+        before = now - offset
+        raw_rows = await conn.fetch(" SELECT * from messages WHERE ts > $1 and server_id in (624361300327268363, 433446063022538753, 468794128340090890)", before)
+        return raw_rows
 
 
 @db_deco
