@@ -169,18 +169,9 @@ def member_join(member: discord.Member, invite: Optional[StoredInvite], manage_g
             embed.add_field(name="Code", value="Bot OAuth Link")
         else:
             embed.add_field(name="__**Invite Information**__",
-                            value="Unable to determine invite information due to an unknown error!", inline=False)
+                            value="Unable to determine invite information. It's likely the invite was a one time use invite."
+                                  " You may be able to determine the inviter by using the Audit Log.", inline=False)
 
-
-    # invite_used_value = "Unknown"
-    # if invite is not None:
-    #     invite_uses = " with **{}** uses".format(invite.uses) if invite.uses > 0 else ""
-    #     if invite.invite_name is not None:
-    #         invite_used_value = "**{}**(**{}**){}".format(invite.invite_name, invite.invite_id, invite_uses)
-    #     else:
-    #         invite_used_value = "**{}**{}".format(invite.invite_id, invite_uses)
-
-    # embed.add_field(name="Invite Used", value=invite_used_value, inline=True)
     embed.set_footer(text="User ID: {}".format(member.id))
 
     return embed
