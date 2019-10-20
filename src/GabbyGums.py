@@ -20,6 +20,7 @@ from discord.utils import oauth_url
 
 import embeds
 import db
+import utils
 
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s")
@@ -464,7 +465,7 @@ async def past_messages(ctx, hours: int, max: int = 15):
     for row in rows:
         log_msg = "mid: {}, sid: {}, uid: {}, ts: {}, message: \n**{}**".format(row['message_id'], row['server_id'], row['user_id'], row['ts'].strftime("%b %d, %Y, %I:%M:%S %p UTC"), row['content'])
         logging.info(log_msg)
-        await ctx.send(log_msg)
+        await utils.send_long_msg(ctx, log_msg)
         await asyncio.sleep(1)
 
 
@@ -617,7 +618,6 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
                 attachments.append(new_attach)
             except FileNotFoundError:
                 pass  # The file may have been too old and has since been deleted.
-
 
     if msg == "":
         msg = "None"
@@ -788,10 +788,10 @@ async def find_used_invite(member: discord.Member) -> Optional[db.StoredInvite]:
     if 'error_log_channel' in config:
         error_log_channel = client.get_channel(config['error_log_channel'])
         await error_log_channel.send("UNABLE TO DETERMINE INVITE USED.")
-        await error_log_channel.send("Stored invites: {}".format(stored_invites))
-        await error_log_channel.send("Current invites: {}".format(current_invite_debug_msg))
-        await error_log_channel.send("Server: {}".format(repr(member.guild)))
-        await error_log_channel.send("Member who joined: {}".format(repr(member)))
+        await utils.send_long_msg(error_log_channel, "Stored invites: {}".format(stored_invites), code_block=True)
+        await utils.send_long_msg(error_log_channel, "Current invites: {}".format(current_invite_debug_msg), code_block=True)
+        await utils.send_long_msg(error_log_channel, "Server: {}".format(repr(member.guild)), code_block=True)
+        await utils.send_long_msg(error_log_channel, "Member who joined: {}".format(repr(member)), code_block=True)
 
     await update_invite_cache(member.guild, invites=current_invites)
     return None
