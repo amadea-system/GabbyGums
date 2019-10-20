@@ -314,7 +314,7 @@ async def create_tables(pool):
                                username      TEXT,
                                discriminator SMALLINT,
                                nickname      TEXT,
-                               is_webhook    BOOL DEFAULT FALSE
+                               is_webhook    BOOL DEFAULT FALSE,
                                UNIQUE (user_id, server_id)
                            )
                        ''')
