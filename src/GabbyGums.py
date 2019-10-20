@@ -43,7 +43,7 @@ async def is_channel_ignored(pool: asyncpg.pool.Pool, guild_id: int, channel_id:
 async def is_user_ignored(pool, guild_id: int, user_id: int) -> bool:
     _ignored_users = await db.get_ignored_users(pool, guild_id)
     if user_id in _ignored_users:
-        return True# This is a message from a user the guild does not wish to log. Do not log the event.
+        return True  # This is a message from a user the guild does not wish to log. Do not log the event.
     return False
 
 
@@ -306,9 +306,9 @@ async def ping_command(ctx):
     await msg.edit(embed=new_embed)
 
 
-@client.command(name='top',
-                brief='Shows CPU and memory usage.',
-                description='Shows CPU and memory usage.')
+@client.command(name='stats',
+                brief='Shows various stats such as CPU, memory usage, disk space usage, and more.',
+                description='Shows various stats such as CPU, memory usage, disk space usage, and more.')
 async def top_command(ctx):
 
     def folder_size(path='.'):
@@ -338,7 +338,7 @@ async def top_command(ctx):
 
     embed = discord.Embed(title="CPU and memory usage:",
                           description="CPU: **{}%** \nLoad average: **{:.2f}, {:.2f}, {:.2f}**\nMemory: **{:.2f} MB**"
-                                      "\nDisk space: **{:.2f} MB Free**, **{:.2f} MB Used**, **{}% Used**\nDisk spaced used by image cache: **{:.2f} MB Used** with **{} files** \nCached messages in DB: **{}**\nCached messages in memory: **{}**\n# of guilds: **{}**".
+                                      "\nDisk space: **{:.2f} MB Free**, **{:.2f} MB Used**, **{}% Used**\nDisk space used by image cache: **{:.2f} MB Used** with **{} files** \nCached messages in DB: **{}**\nCached messages in memory: **{}**\n# of guilds: **{}**".
                           format(psutil.cpu_percent(), load_average[0], load_average[1], load_average[2], memory_use,
                                  disk_space_free, disk_space_used, disk_space_percent_used, image_cache_du_used, num_of_files_in_cache, num_of_db_cached_messages, len(client.cached_messages), len(client.guilds)), color=0x00b7fa)
 
@@ -382,14 +382,14 @@ async def verify_permissions(ctx, guild_id: Optional[str] = None):
             if permissions.send_messages is False:
                 errors_found = True
                 perms['send'].append(channel.name)
-                #TODO: Check if this channel is currently set as a logging channel or if anything is set as a log channel.
+                # TODO: Check if this channel is currently set as a logging channel or if anything is set as a log channel.
 
             if (permissions.view_audit_log is False) or (permissions.embed_links is False) or\
                     (permissions.read_message_history is False) or (permissions.external_emojis is False) or \
                     permissions.attach_files is False or permissions.add_reactions is False:
                 errors_found = True
                 perms['non-crit'].append(channel.name)
-                #TODO: Actually List out the missing not-critical permisions.
+                # TODO: Actually List out the missing not-critical permissions.
 
     if len(perms['read']) > 0:
         read_msg = "ERROR!! The following channels do not have the **Read Messages** permission. " \
@@ -546,7 +546,7 @@ async def on_error(event_name, *args):
         logging.error("After Content:{}.".format(args[0].data['content']))
         if args[0].cached_message is not None:
             logging.error("Before Content:{}.".format(args[0].cached_message.content))
-    #Todo: Add more
+    # Todo: Add more
 
     traceback_message = "```python\n{}```".format(traceback.format_exc())
     traceback_message = (traceback_message[:1993] + ' ...```') if len(traceback_message) > 2000 else traceback_message
@@ -563,7 +563,7 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
     if payload.guild_id is None:
         return  # We are in a DM, Don't log the message
 
-    #Get the cached msg from the DB (if possible)
+    # Get the cached msg from the DB (if possible)
     db_cached_message = await db.get_cached_message(pool, payload.guild_id, payload.message_id)
 
     log_channel = await get_guild_logging_channel(payload.guild_id)
@@ -830,7 +830,7 @@ async def on_member_remove(member: discord.Member):
 
 @client.event
 async def on_user_update(before, after):
-    #username, Discriminator
+    # username, Discriminator
     # print("User_update")
     # print(after)
     pass
@@ -838,7 +838,7 @@ async def on_user_update(before, after):
 
 @client.event
 async def on_member_update(before: discord.Member, after: discord.Member):
-    #nickname
+    # nickname
 
     if before.nick != after.nick:
         print("<@{}> ({}#{}) changed their name from {} to {}".format(after.id, after.name, after.discriminator, before.nick, after.nick))
