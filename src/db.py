@@ -10,17 +10,25 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 import time
 from datetime import datetime, timedelta
+import json
 
-
-import asyncio
 import asyncpg
 from discord import Invite, Message
+import GuildConfigs
 
 
 async def create_db_pool(uri: str) -> asyncpg.pool.Pool:
 
     # FIXME: Error Handling
-    return await asyncpg.create_pool(uri)
+    async def init_connection(conn):
+        await conn.set_type_codec('json',
+                                  encoder=json.dumps,
+                                  decoder=json.loads,
+                                  schema='pg_catalog')
+
+    pool: asyncpg.pool.Pool = await asyncpg.create_pool(uri, init=init_connection)
+
+    return pool
 
 
 def db_deco(func):
@@ -91,6 +99,20 @@ async def update_log_enabled(pool, sid: int, log_enabled: bool):
     async with pool.acquire() as conn:
         await ensure_server_exists(conn, sid)
         await conn.execute("UPDATE servers SET logging_enabled = $1 WHERE server_id = $2", log_enabled, sid)
+
+
+@db_deco
+async def set_server_log_configs(pool, sid: int, log_configs: GuildConfigs.GuildLoggingConfig):
+    async with pool.acquire() as conn:
+        await ensure_server_exists(conn, sid)
+        await conn.execute("UPDATE servers SET log_configs = $1 WHERE server_id = $2", log_configs.to_dict(), sid)
+
+
+@db_deco
+async def get_server_log_configs(pool, sid: int) -> GuildConfigs.GuildLoggingConfig:
+    async with pool.acquire() as conn:
+        value = await conn.fetchval('SELECT log_configs FROM servers WHERE server_id = $1', sid)
+        return GuildConfigs.load_nested_dict(GuildConfigs.GuildLoggingConfig, value) if value else GuildConfigs.GuildLoggingConfig()
 
 
 @db_deco
@@ -180,7 +202,7 @@ class StoredInvite:
 
 @dataclass
 class StoredInvites:
-    invites: List[StoredInvite] = field(default_factory=[])
+    invites: List[StoredInvite] = field(default_factory=[])  # Needed to ensure that all StoredInvites do not share the same list
 
     def find_invite(self, invite_id: str) -> Optional[StoredInvite]:
         for invite in self.invites:
@@ -268,7 +290,8 @@ async def create_tables(pool):
                                server_id       BIGINT PRIMARY KEY,
                                server_name     TEXT,
                                log_channel_id  BIGINT,
-                               logging_enabled BOOLEAN NOT NULL DEFAULT TRUE
+                               logging_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                               log_configs     JSON DEFAULT NULL
                            )
                        ''')
 
