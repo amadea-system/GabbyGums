@@ -128,7 +128,7 @@ def unknown_deleted_message(channel_id, message_id) -> discord.Embed:
     return embed
 
 
-def member_join(member: discord.Member, invite: Optional[db.StoredInvite], manage_guild=True) -> discord.Embed:
+def member_join(member: discord.Member, invite: Optional[StoredInvite], manage_guild=True) -> discord.Embed:
     embed = discord.Embed(description="<@!{}> - {}#{}".format(member.id, member.name, member.discriminator),
                           color=0x00ff00, timestamp=datetime.utcnow())
 
