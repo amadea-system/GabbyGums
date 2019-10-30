@@ -18,10 +18,12 @@ import discord
 from discord.ext import commands
 from discord.utils import oauth_url
 
-import embeds
-import db
-import utils
 
+import db
+import embeds
+import utils
+# from GuildConfigs import get_event_or_guild_logging_channel, GuildLoggingConfig, EventConfig
+import GuildConfigs
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s")
 
@@ -47,15 +49,22 @@ async def is_user_ignored(pool, guild_id: int, user_id: int) -> bool:
     return False
 
 
-async def get_guild_logging_channel(guild_id: int) -> Optional[discord.TextChannel]:
+async def get_event_or_guild_logging_channel(guild_id: int, event_type: Optional[str] = None) -> Optional[discord.TextChannel]:
+    if event_type is not None:
+        log_configs = await db.get_server_log_configs(pool, guild_id)
+        event_configs = log_configs[event_type]
+        if event_configs is not None:
+            if event_configs.enabled is False:
+                return None # Logs for this type are disabled. Exit now.
+            if event_configs.log_channel_id is not None:
+                return await get_channel_safe(event_configs.log_channel_id)  # return event specific log channel
 
+    # No valid event specific configs exist. Attempt to use default log channel.
     _log_channel_id = await db.get_log_channel(pool, guild_id)
     if _log_channel_id is not None:
-        log_channel = client.get_channel(_log_channel_id)
-        if log_channel is None:
-            print("get_log_ch failed. WHY?????")
-            log_channel = await client.fetch_channel(_log_channel_id)
-        return log_channel
+        return await get_channel_safe(_log_channel_id)
+
+    # No valid event configs or global configs found. Only option is to silently fail
     return None
 
 
@@ -204,6 +213,71 @@ async def add(ctx, channel: discord.TextChannel):
 async def remove(ctx, channel: discord.TextChannel):
     await db.remove_ignored_channel(pool, ctx.guild.id, channel.id)
     await ctx.send("<#{}> is no longer being ignored.".format(channel.id))
+
+
+# ----- Event Management Commands ----- #
+@commands.has_permissions(manage_messages=True)
+@commands.guild_only()
+@client.group(name="config_event", brief="Allows for setting per event log channels and/or disabling specific events from being logged.",
+              description="Allows for setting per event log channels and/or disabling specific events from being logged.",
+              usage='<command> [channel]')
+async def config_event(ctx):
+    if ctx.invoked_subcommand is None:
+
+        help_msg = "This command allows for setting per event log channels and/or disabling specific events from being logged.\n" \
+                   "The following event types are configurable:```{}```\n" \
+                   "To set a specific logging channel for a specific event type use the following command structure:\n```{command_prefix}config_event channel [event type] [channel mention or id]```\n" \
+                   "For example:```{command_prefix}config_event channel member_join #join-logs``` would set all log messages of people joining to the channel #join-logs.\n\n" \
+                   "To clear a specific logging channel for a specific event type use the following command structure:\n```{command_prefix}config_event channel [event type]```\n" \
+                   "For example:```{command_prefix}config_event channel member_join``` would set all log messages of people joining back to the default log channel.\n\n" \
+                   "To enable / disable a specific event type use the following command structure:\n```{command_prefix}enabled [event type] [True or False]```\n" \
+                   "For example:```{command_prefix}config_event enabled message_edit False``` would disable all log messages of edited messages.\n".format(", ".join(GuildConfigs.GuildLoggingConfig().available_event_types()), command_prefix=client.command_prefix)
+
+        await ctx.send(help_msg)
+
+
+@config_event.command(name="channel")
+async def _channel(ctx, event_type: str, channel: Optional[discord.TextChannel] = None):
+    event_types = GuildConfigs.GuildLoggingConfig().available_event_types()
+    event_type = event_type.lower()
+    if event_type not in event_types:
+        await ctx.send("{} is not a valid event type!\n The following event types are configurable:``` {}```".format(event_type, ", ".join(event_types)))
+        return
+    else:
+        guild_event_configs = await db.get_server_log_configs(pool, ctx.guild.id)
+        channel_id = channel.id if channel is not None else None
+
+        if guild_event_configs[event_type] is not None:
+            guild_event_configs[event_type].log_channel_id = channel_id
+        else:
+            guild_event_configs[event_type] = GuildConfigs.EventConfig(log_channel_id=channel_id)
+        await db.set_server_log_configs(pool, ctx.guild.id, guild_event_configs)
+        if channel is not None:
+            await ctx.send("{} messages will now be logged to #{}".format(event_type, channel.name))
+        else:  # TODO: Add the default log channels name to the following message.
+            await ctx.send("{} messages will now be logged to the default log channel.".format(event_type))
+
+
+@config_event.command(name="enabled")
+async def enabled(ctx, event_type: str, is_enabled: bool):
+    event_types = GuildConfigs.GuildLoggingConfig().available_event_types()
+    event_type = event_type.lower()
+    if event_type not in event_types:
+        await ctx.send("{} is not a valid event type!\nThe following event types are configurable:``` {}```".format(
+            event_type, ", ".join(event_types)))
+        return
+    else:
+        guild_event_configs = await db.get_server_log_configs(pool, ctx.guild.id)
+
+        if guild_event_configs[event_type] is not None:
+            guild_event_configs[event_type].enabled = is_enabled
+        else:
+            guild_event_configs[event_type] = GuildConfigs.EventConfig(enabled=is_enabled)
+        await db.set_server_log_configs(pool, ctx.guild.id, guild_event_configs)
+        if is_enabled is True:
+            await ctx.send("{} messages will now be logged.".format(event_type))
+        else:
+            await ctx.send("{} messages will no longer logged.".format(event_type))
 
 
 # ----- Data management commands ----- #
@@ -417,7 +491,7 @@ async def verify_permissions(ctx, guild_id: Optional[str] = None):
         noncrit_msg = noncrit_msg + "\n".join(perms['non-crit'])
         embed.add_field(name="Non-Critical Permissions Problems", value=noncrit_msg, inline=True)
 
-    guild_logging_channel = await get_guild_logging_channel(guild.id)
+    guild_logging_channel = await get_event_or_guild_logging_channel(guild.id)  # TODO: List event specific configs
     if guild_logging_channel is not None:
         embed.add_field(name="Currently Configured Log Channel ", value="#{}".format(guild_logging_channel.name), inline=True)
     else:
@@ -555,6 +629,7 @@ async def on_error(event_name, *args):
 
 @client.event
 async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
+    event_type = "message_delete"
 
     async def cleanup_message_cache():
         if db_cached_message is not None:
@@ -566,7 +641,7 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
     # Get the cached msg from the DB (if possible)
     db_cached_message = await db.get_cached_message(pool, payload.guild_id, payload.message_id)
 
-    log_channel = await get_guild_logging_channel(payload.guild_id)
+    log_channel = await get_event_or_guild_logging_channel(payload.guild_id, event_type)
     if log_channel is None:
         # Silently fail if no log channel is configured.
         await cleanup_message_cache()
@@ -633,6 +708,7 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
 
 @client.event
 async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
+    event_type = "message_edit"
 
     if 'content' in payload.data and payload.data['content'] != '':  # Makes sure there is a message content
         if "guild_id" not in payload.data:
@@ -675,7 +751,7 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
 
         embed = embeds.edited_message(author_id, author.name, author.discriminator, channel_id, before_msg, after_msg, message_id, guild_id)
 
-        log_channel = await get_guild_logging_channel(guild_id)
+        log_channel = await get_event_or_guild_logging_channel(guild_id, event_type)
         if log_channel is None:
             # Silently fail if no log channel is configured.
             return
@@ -799,6 +875,7 @@ async def find_used_invite(member: discord.Member) -> Optional[db.StoredInvite]:
 
 @client.event
 async def on_member_join(member: discord.Member):
+    event_type = "member_join"
 
     if member.guild.me.guild_permissions.manage_guild:
         invite_used = await find_used_invite(member)
@@ -809,7 +886,7 @@ async def on_member_join(member: discord.Member):
     else:
         embed = embeds.member_join(member, None, manage_guild=False)
 
-    log_channel = await get_guild_logging_channel(member.guild.id)
+    log_channel = await get_event_or_guild_logging_channel(member.guild.id, event_type)
     if log_channel is None:
         # Silently fail if no log channel is configured.
         return
@@ -819,9 +896,10 @@ async def on_member_join(member: discord.Member):
 
 @client.event
 async def on_member_remove(member: discord.Member):
+    event_type = "member_leave"
 
     embed = embeds.member_leave(member)
-    log_channel = await get_guild_logging_channel(member.guild.id)
+    log_channel = await get_event_or_guild_logging_channel(member.guild.id, event_type)
     if log_channel is None:
         # Silently fail if no log channel is configured.
         return
@@ -838,12 +916,12 @@ async def on_user_update(before, after):
 
 @client.event
 async def on_member_update(before: discord.Member, after: discord.Member):
-    # nickname
+    event_type_nick = "guild_member_nickname"  # nickname
+    event_type_update = "guild_member_update"  # Everything else. Currently unused.
 
     if before.nick != after.nick:
-        print("<@{}> ({}#{}) changed their name from {} to {}".format(after.id, after.name, after.discriminator, before.nick, after.nick))
 
-        log_channel = await get_guild_logging_channel(after.guild.id)
+        log_channel = await get_event_or_guild_logging_channel(after.guild.id, event_type_nick)
         if log_channel is None:
             # Silently fail if no log channel is configured.
             return
@@ -891,8 +969,8 @@ async def on_guild_unavailable(guild: discord.Guild):
     logging.warning(log_msg)
 
     if 'error_log_channel' not in config:
-        await db.remove_server(pool, guild.id)
         return
+
     error_log_channel = client.get_channel(config['error_log_channel'])
     await error_log_channel.send(log_msg)
 

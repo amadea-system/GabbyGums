@@ -14,8 +14,8 @@ import json
 
 import asyncpg
 from discord import Invite, Message
-
-from GuildConfigs import GuildLoggingConfig, load_nested_dict
+# from GuildConfigs import GuildLoggingConfig, load_nested_dict
+import GuildConfigs
 
 
 async def create_db_pool(uri: str) -> asyncpg.pool.Pool:
@@ -103,17 +103,17 @@ async def update_log_enabled(pool, sid: int, log_enabled: bool):
 
 
 @db_deco
-async def set_server_log_configs(pool, sid: int, log_configs: GuildLoggingConfig):
+async def set_server_log_configs(pool, sid: int, log_configs: GuildConfigs.GuildLoggingConfig):
     async with pool.acquire() as conn:
         await ensure_server_exists(conn, sid)
         await conn.execute("UPDATE servers SET log_configs = $1 WHERE server_id = $2", log_configs.to_dict(), sid)
 
 
 @db_deco
-async def get_server_log_configs(pool, sid: int) -> GuildLoggingConfig:
+async def get_server_log_configs(pool, sid: int) -> GuildConfigs.GuildLoggingConfig:
     async with pool.acquire() as conn:
         value = await conn.fetchval('SELECT log_configs FROM servers WHERE server_id = $1', sid)
-        return load_nested_dict(GuildLoggingConfig, value) if value else GuildLoggingConfig()
+        return GuildConfigs.load_nested_dict(GuildConfigs.GuildLoggingConfig, value) if value else GuildConfigs.GuildLoggingConfig()
 
 
 @db_deco
