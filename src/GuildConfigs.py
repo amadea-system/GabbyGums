@@ -66,21 +66,18 @@ class GuildLoggingConfig:
     def __setitem__(self, key, value):
         t_key = key.lower()
         # t_key = t_key.replace('_', '')
-
         for variable in self.__dict__.keys():
-            t_var = variable#.replace('_', '')
+            t_var = variable #.replace('_', '')
 
             if t_var.lower() == t_key:
                 setattr(self, variable, value)
                 return
         raise KeyError('{} is not a valid key for type GuildLoggingConfig'.format(key))
 
-
     def __getitem__(self, item):
         t_key = item.lower()
-
         for variable in self.__dict__.keys():
-            t_var = variable#.replace('_', '')
+            t_var = variable #.replace('_', '')
             if t_var.lower() == t_key:
                 return getattr(self, variable)
         raise KeyError('{} is not a valid key for type GuildLoggingConfig'.format(item))

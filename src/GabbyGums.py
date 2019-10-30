@@ -22,7 +22,6 @@ from discord.utils import oauth_url
 import db
 import embeds
 import utils
-# from GuildConfigs import get_event_or_guild_logging_channel, GuildLoggingConfig, EventConfig
 import GuildConfigs
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s")

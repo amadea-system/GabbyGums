@@ -5,8 +5,8 @@
 import discord
 from datetime import datetime
 from typing import Optional, Union
-# from db import StoredInvite
-# import db
+from db import StoredInvite
+
 
 # TODO: Make these all async?
 
@@ -128,8 +128,7 @@ def unknown_deleted_message(channel_id, message_id) -> discord.Embed:
     return embed
 
 
-def member_join(member: discord.Member, invite, manage_guild=True) -> discord.Embed:
-# def member_join(member: discord.Member, invite: Optional[db.StoredInvite], manage_guild=True) -> discord.Embed:
+def member_join(member: discord.Member, invite: Optional[db.StoredInvite], manage_guild=True) -> discord.Embed:
     embed = discord.Embed(description="<@!{}> - {}#{}".format(member.id, member.name, member.discriminator),
                           color=0x00ff00, timestamp=datetime.utcnow())
 

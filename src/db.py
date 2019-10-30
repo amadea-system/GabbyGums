@@ -14,7 +14,6 @@ import json
 
 import asyncpg
 from discord import Invite, Message
-# from GuildConfigs import GuildLoggingConfig, load_nested_dict
 import GuildConfigs
 
 
