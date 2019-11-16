@@ -35,15 +35,15 @@ client.remove_command("help")  # Remove the built in help command so we can make
 
 
 async def is_channel_ignored(pool: asyncpg.pool.Pool, guild_id: int, channel_id: int) -> bool:
-    _ignored_channels = await db.get_ignored_channels(pool, guild_id)
-    if channel_id in _ignored_channels:
+    _ignored_channels = await db.get_ignored_channels(pool, int(guild_id))
+    if int(channel_id) in _ignored_channels:
         return True  # TODO: Optimise this
     return False
 
 
 async def is_user_ignored(pool, guild_id: int, user_id: int) -> bool:
-    _ignored_users = await db.get_ignored_users(pool, guild_id)
-    if user_id in _ignored_users:
+    _ignored_users = await db.get_ignored_users(pool, int(guild_id))
+    if int(user_id) in _ignored_users:
         return True  # This is a message from a user the guild does not wish to log. Do not log the event.
     return False
 
