@@ -229,7 +229,7 @@ async def config_event(ctx):
                    "For example:```{command_prefix}config_event channel member_join #join-logs``` would set all log messages of people joining to the channel #join-logs.\n\n" \
                    "To clear a specific logging channel for a specific event type use the following command structure:\n```{command_prefix}config_event channel [event type]```\n" \
                    "For example:```{command_prefix}config_event channel member_join``` would set all log messages of people joining back to the default log channel.\n\n" \
-                   "To enable / disable a specific event type use the following command structure:\n```{command_prefix}enabled [event type] [True or False]```\n" \
+                   "To enable / disable a specific event type use the following command structure:\n```{command_prefix}config_event enabled [event type] [True or False]```\n" \
                    "For example:```{command_prefix}config_event enabled message_edit False``` would disable all log messages of edited messages.\n".format(", ".join(GuildConfigs.GuildLoggingConfig().available_event_types()), command_prefix=client.command_prefix)
 
         await ctx.send(help_msg)
@@ -276,7 +276,7 @@ async def enabled(ctx, event_type: str, is_enabled: bool):
         if is_enabled is True:
             await ctx.send("{} messages will now be logged.".format(event_type))
         else:
-            await ctx.send("{} messages will no longer logged.".format(event_type))
+            await ctx.send("{} messages will no longer be logged.".format(event_type))
 
 
 # ----- Data management commands ----- #
