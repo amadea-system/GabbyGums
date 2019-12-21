@@ -734,6 +734,10 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
             # This is a Gabby Gums message. Do not log the event.
             return
 
+        if after_msg == before_msg:
+            # The message content has not changed. This is a pin/unpin, embed edit (which would be from a bot or discord)
+            return
+
         if await is_user_ignored(pool, guild_id, author_id):
             return
 
