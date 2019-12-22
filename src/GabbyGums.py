@@ -85,7 +85,7 @@ async def get_channel_safe(channel_id: int) -> discord.TextChannel:
 
 @client.event
 async def on_ready():
-    logging.info('Connected!')
+    logging.info('Connected using discord.py version {}!'.format(discord.__version__))
     logging.info('Username: {0.name}, ID: {0.id}'.format(client.user))
     logging.info("Connected to {} servers.".format(len(client.guilds)))
     logging.info('------')
