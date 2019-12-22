@@ -82,11 +82,13 @@ def edited_message(author_id, author_name: str, author_discrim, channel_id, befo
     return embed
 
 
-def deleted_message(message_content: str, author: discord.Member, channel_id: int, message_id: int = -1,
+def deleted_message(message_content: str, author: Optional[discord.Member], channel_id: int, message_id: int = -1,
                     cached: bool = True) -> discord.Embed:
 
     if cached:
-        if author.discriminator == "0000":
+        if author is None:
+            description_text = info_author = "Uncached User"
+        elif author.discriminator == "0000":
             description_text = "{}#{}".format(author.name, author.discriminator)
             info_author = "{}#{}".format(author.name, author.discriminator)
         else:
@@ -109,7 +111,8 @@ def deleted_message(message_content: str, author: discord.Member, channel_id: in
         else:
             embed.add_field(name="Message:", value=message_content, inline=False)
 
-        embed.set_footer(text="User ID: {}".format(author.id))
+        if author is not None:
+            embed.set_footer(text="User ID: {}".format(author.id))
 
         return embed
     else:

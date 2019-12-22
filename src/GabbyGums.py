@@ -657,7 +657,7 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
         msg = payload.cached_message.content if payload.cached_message is not None else db_cached_message.content
         author = payload.cached_message.author if payload.cached_message is not None else client.get_user(db_cached_message.user_id)
 
-        if client.user.id == author.id or await is_user_ignored(pool, payload.guild_id, author.id):
+        if author is not None and (client.user.id == author.id or await is_user_ignored(pool, payload.guild_id, author.id)):
             await cleanup_message_cache()
             return
     else:
