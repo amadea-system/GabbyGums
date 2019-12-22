@@ -48,6 +48,14 @@ async def is_user_ignored(pool, guild_id: int, user_id: int) -> bool:
     return False
 
 
+async def is_category_ignored(pool: asyncpg.pool.Pool, guild_id: int, category: Optional[discord.CategoryChannel]) -> bool:
+    if category is not None:  # If channel is not in a category, don't bother querying DB
+        _ignored_categories = await db.get_ignored_categories(pool, int(guild_id))
+        if category.id in _ignored_categories:
+            return True
+    return False
+
+
 async def get_event_or_guild_logging_channel(guild_id: int, event_type: Optional[str] = None) -> Optional[discord.TextChannel]:
     if event_type is not None:
         log_configs = await db.get_server_log_configs(pool, guild_id)
@@ -212,6 +220,44 @@ async def add(ctx, channel: discord.TextChannel):
 async def remove(ctx, channel: discord.TextChannel):
     await db.remove_ignored_channel(pool, ctx.guild.id, channel.id)
     await ctx.send("<#{}> is no longer being ignored.".format(channel.id))
+
+
+# ----- Ignore Category Commands ----- #
+@commands.has_permissions(manage_messages=True)
+@commands.guild_only()
+@client.group(name="ignore_category", brief="Sets which categories will be ignored by Gabby Gums",
+              description="Sets which categories will be ignored by Gabby Gums. "
+                          "When using subcommands that require including the category (add/remove) it is suggested to use the id of the category. "
+                          "If you choose to use the name instead, be aware that despite Discord showing all categories to be uppercase, "
+                          "this is not true behind the scenes. "
+                          "As such you must be sure to match the capitalism to be the same as when you created it.",
+              usage='<command> [category]')
+async def ignore_category(ctx):
+    if ctx.invoked_subcommand is None:
+        await ctx.send_help(ignore_category)
+
+
+@ignore_category.command(name="list", brief="Lists which categories are currently ignored.")
+async def list_categories(ctx):
+    _ignored_categories = await db.get_ignored_categories(pool, ctx.guild.id)
+    if len(_ignored_categories) > 0:
+        await ctx.send("The following categories are being ignored by Gabby Gums:")
+        for category_id in _ignored_categories:
+            await ctx.send("<#{}>".format(category_id))
+    else:
+        await ctx.send("No categories are being ignored by Gabby Gums.")
+
+
+@ignore_category.command(name="add", brief="Add a new category to be ignored")
+async def add_category(ctx, *, category: discord.CategoryChannel):
+    await db.add_ignored_category(pool, ctx.guild.id, category.id)
+    await ctx.send("<#{}> has been ignored.".format(category.id))
+
+
+@ignore_category.command(name="remove", brief="Stop ignoring a category")
+async def remove_category(ctx, *, category: discord.CategoryChannel):
+    await db.remove_ignored_category(pool, ctx.guild.id, category.id)
+    await ctx.send("<#{}> is no longer being ignored.".format(category.id))
 
 
 # ----- Event Management Commands ----- #
@@ -506,6 +552,14 @@ async def verify_permissions(ctx, guild_id: Optional[str] = None):
     else:
         embed.add_field(name="Channels Currently Being Ignored ", value="**NONE**", inline=True)
 
+    _ignored_categories = await db.get_ignored_categories(pool, guild.id)
+    if len(_ignored_categories) > 0:
+        categories_id_msg_fragments = [f"<#{category_id}>" for category_id in _ignored_categories]
+        categories_msg = "\n".join(categories_id_msg_fragments)
+        embed.add_field(name="All channels under the following categories are currently being ignored ", value=categories_msg, inline=True)
+    else:
+        embed.add_field(name="All channels under the following categories are currently being ignored ", value="**NONE**", inline=True)
+
     if errors_found:
         embed.description = "Uh oh! Problems were found!"
     else:
@@ -650,6 +704,11 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
         await cleanup_message_cache()
         return
 
+    channel: discord.TextChannel = await get_channel_safe(payload.channel_id)
+    if await is_category_ignored(pool, payload.guild_id, channel.category):
+        await cleanup_message_cache()
+        return
+
     channel_id = payload.channel_id
 
     if payload.cached_message is not None or db_cached_message is not None:
@@ -682,7 +741,7 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
         for attachment_name in db_cached_message.attachments:
             spoil = True if "SPOILER" in attachment_name else False
             if spoil is False:
-                channel = await get_channel_safe(payload.channel_id)
+                # channel = await get_channel_safe(payload.channel_id)
                 if channel.is_nsfw():
                     spoil = True  # Make ANY image from an NSFW board spoiled to keep log channels SFW.
             try:
@@ -742,6 +801,10 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
             return
 
         if await is_channel_ignored(pool, guild_id, channel_id):
+            return
+
+        channel: discord.TextChannel = await get_channel_safe(channel_id)
+        if await is_category_ignored(pool, guild_id, channel.category):
             return
 
         if author is None:

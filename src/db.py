@@ -115,6 +115,8 @@ async def get_server_log_configs(pool, sid: int) -> GuildConfigs.GuildLoggingCon
         return GuildConfigs.load_nested_dict(GuildConfigs.GuildLoggingConfig, value) if value else GuildConfigs.GuildLoggingConfig()
 
 
+# ----- Ignored Users DB Functions ----- #
+
 @db_deco
 async def add_ignored_user(pool, sid: int, ignored_user_id: int):  # Good
     async with pool.acquire() as conn:
@@ -136,6 +138,8 @@ async def get_ignored_users(pool, sid: int) -> List[int]:  # Good
     return rows
 
 
+# ----- Ignored Channels DB Functions ----- #
+
 @db_deco
 async def add_ignored_channel(pool, sid: int, ignored_channel_id: int):  # Good
     async with pool.acquire() as conn:
@@ -156,6 +160,30 @@ async def get_ignored_channels(pool, sid: int) -> List[int]:  # Good
         rows = [row["channel_id"] for row in raw_rows]
     return rows
 
+
+# ----- Ignored Categories DB Functions ----- #
+
+@db_deco
+async def add_ignored_category(pool, sid: int, ignored_category_id: int):  # Good
+    async with pool.acquire() as conn:
+        await conn.execute("INSERT INTO ignored_category(category_id, server_id) VALUES($1, $2)", ignored_category_id, sid)
+
+
+@db_deco
+async def remove_ignored_category(pool, sid: int, ignored_category_id: int):  # Good
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM ignored_category WHERE server_id = $1 AND category_id = $2", sid, ignored_category_id)
+
+
+@db_deco
+async def get_ignored_categories(pool, sid: int) -> List[int]:  # Good
+    async with pool.acquire() as conn:
+        raw_rows = await conn.fetch('SELECT category_id FROM ignored_category WHERE server_id = $1', sid)
+        category_ids = [row["category_id"] for row in raw_rows]
+    return category_ids
+
+
+# ----- Invite DB Functions ----- #
 
 @db_deco
 async def store_invite(pool, sid: int, invite_id: str, invite_uses: int = 0):
@@ -219,6 +247,8 @@ async def get_invites(pool, sid: int) -> StoredInvites:
         #Fixme: Does fetch return None or 0 length list when no entries are found?
         return StoredInvites(invites=[StoredInvite(**row) for row in raw_rows])
 
+
+# ----- Cached Messages DB Functions ----- #
 
 @dataclass
 class CachedMessage:
@@ -305,29 +335,39 @@ async def create_tables(pool):
                            )
                        ''')
 
+        # Create ignored_category table
+        await conn.execute('''
+                           CREATE TABLE if not exists ignored_category(
+                                id          SERIAL PRIMARY KEY,
+                                server_id   BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
+                                category_id BIGINT NOT NULL,
+                                UNIQUE (server_id, category_id)
+                           )
+                       ''')
+
         # Create ignored_users table
         await conn.execute('''
-                               CREATE TABLE if not exists ignored_users(
-                                    id           SERIAL PRIMARY KEY,
-                                    server_id    BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE, 
-                                    user_id      BIGINT NOT NULL,
-                                    UNIQUE (server_id, user_id)
-                               )
-                           ''')
+                           CREATE TABLE if not exists ignored_users(
+                                id           SERIAL PRIMARY KEY,
+                                server_id    BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE, 
+                                user_id      BIGINT NOT NULL,
+                                UNIQUE (server_id, user_id)
+                           )
+                       ''')
 
         # Create invites table
         # Will need to execute "ALTER TABLE invites ADD UNIQUE (server_id, invite_id)" to alter the existing production table
         await conn.execute('''
-                              CREATE TABLE if not exists invites(
-                                  id            SERIAL PRIMARY KEY,
-                                  server_id     BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
-                                  invite_id     TEXT NOT NULL,
-                                  uses          INTEGER NOT NULL DEFAULT 0,
-                                  invite_name   TEXT,
-                                  invite_desc   TEXT,
-                                  UNIQUE (server_id, invite_id)
-                              )
-                          ''')
+                          CREATE TABLE if not exists invites(
+                              id            SERIAL PRIMARY KEY,
+                              server_id     BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
+                              invite_id     TEXT NOT NULL,
+                              uses          INTEGER NOT NULL DEFAULT 0,
+                              invite_name   TEXT,
+                              invite_desc   TEXT,
+                              UNIQUE (server_id, invite_id)
+                          )
+                      ''')
 
         # Create users table
         await conn.execute('''
