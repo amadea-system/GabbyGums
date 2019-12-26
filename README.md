@@ -22,5 +22,5 @@ Please join the Gabby Gums support discord server if you have any problems or wi
 https://discord.gg/Xwhk89T
 
 ## How to add Gabby Gums to your server
-You can get the invite link for the main instance that I host at the support server linked above
-If you are having problems self hosting Gabby Gums, please join the support server and ask for assistance 
+You can get the invite link for the main instance that I host at the support server linked above.  
+If you are having problems self hosting Gabby Gums, please join the support server and ask for assistance. Eventually there will instructions included here for configureing and running the bot yourself.
