@@ -76,11 +76,14 @@ async def get_event_or_guild_logging_channel(pool: asyncpg.pool.Pool, guild_id: 
     return None
 
 
-async def get_channel_safe(channel_id: int) -> discord.TextChannel:
+async def get_channel_safe(channel_id: int) -> Optional[discord.TextChannel]:
     channel = client.get_channel(channel_id)
     if channel is None:
-        print("get ch failed. WHY?????")
-        channel = await client.fetch_channel(channel_id)
+        logging.info("bot.get_channel failed. Querying API...")
+        try:
+            channel = await client.fetch_channel(channel_id)
+        except discord.NotFound:
+            return None
     return channel
 
 
@@ -519,18 +522,18 @@ async def verify_permissions(ctx: commands.Context, guild_id: Optional[str] = No
         if channel.type == discord.ChannelType.text:
             if permissions.read_messages is False:
                 errors_found = True
-                perms['read'].append(channel.name)
+                perms['read'].append(f"#{channel.name}")
 
             if permissions.send_messages is False:
                 errors_found = True
-                perms['send'].append(channel.name)
+                perms['send'].append(f"#{channel.name}")
                 # TODO: Check if this channel is currently set as a logging channel or if anything is set as a log channel.
 
             if (permissions.view_audit_log is False) or (permissions.embed_links is False) or\
                     (permissions.read_message_history is False) or (permissions.external_emojis is False) or \
                     permissions.attach_files is False or permissions.add_reactions is False:
                 errors_found = True
-                perms['non-crit'].append(channel.name)
+                perms['non-crit'].append(f"#{channel.name}")
                 # TODO: Actually List out the missing not-critical permissions.
 
     if len(perms['read']) > 0:
@@ -566,11 +569,14 @@ async def verify_permissions(ctx: commands.Context, guild_id: Optional[str] = No
         embed.add_field(name="Currently Configured Log Channel ", value="**NONE**", inline=True)
 
     channels_msg = ""
-    _ignored_channels = await db.get_ignored_channels(bot.db_pool, guild.id)
-    if len(_ignored_channels) > 0:
-        for channel_id in _ignored_channels:
+    _ignored_channels_ids = await db.get_ignored_channels(bot.db_pool, guild.id)
+    if len(_ignored_channels_ids) > 0:
+        for channel_id in _ignored_channels_ids:
             ignored_channel = await get_channel_safe(channel_id)
-            channels_msg = channels_msg + "#{}\n".format(ignored_channel.name)
+            if ignored_channel is not None:
+                channels_msg = channels_msg + "#{}\n".format(ignored_channel.name)
+            else:
+                channels_msg = channels_msg + "Deleted channel w/ ID: {}\n".format(channel_id)
         embed.add_field(name="Channels Currently Being Ignored ", value=channels_msg, inline=True)
     else:
         embed.add_field(name="Channels Currently Being Ignored ", value="**NONE**", inline=True)
