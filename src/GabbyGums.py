@@ -23,14 +23,15 @@ import db
 import embeds
 import utils
 import GuildConfigs
+from bot import GGBot
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s")
 
-client = commands.Bot(command_prefix="g!",
-                      max_messages=100000,
-                      # description="A simple logging bot that ignores PluralKit proxies.\n",
-                      owner_id=389590659335716867,
-                      case_insensitive=True)
+client = GGBot(command_prefix="g!",
+               max_messages=100000,
+               # description="A simple logging bot that ignores PluralKit proxies.\n",
+               owner_id=389590659335716867,
+               case_insensitive=True)
 client.remove_command("help")  # Remove the built in help command so we can make the about section look nicer.
 
 
@@ -41,7 +42,7 @@ async def is_channel_ignored(pool: asyncpg.pool.Pool, guild_id: int, channel_id:
     return False
 
 
-async def is_user_ignored(pool, guild_id: int, user_id: int) -> bool:
+async def is_user_ignored(pool: asyncpg.pool.Pool, guild_id: int, user_id: int) -> bool:
     _ignored_users = await db.get_ignored_users(pool, int(guild_id))
     if int(user_id) in _ignored_users:
         return True  # This is a message from a user the guild does not wish to log. Do not log the event.
@@ -56,13 +57,13 @@ async def is_category_ignored(pool: asyncpg.pool.Pool, guild_id: int, category: 
     return False
 
 
-async def get_event_or_guild_logging_channel(guild_id: int, event_type: Optional[str] = None) -> Optional[discord.TextChannel]:
+async def get_event_or_guild_logging_channel(pool: asyncpg.pool.Pool, guild_id: int, event_type: Optional[str] = None) -> Optional[discord.TextChannel]:
     if event_type is not None:
         log_configs = await db.get_server_log_configs(pool, guild_id)
         event_configs = log_configs[event_type]
         if event_configs is not None:
             if event_configs.enabled is False:
-                return None # Logs for this type are disabled. Exit now.
+                return None  # Logs for this type are disabled. Exit now.
             if event_configs.log_channel_id is not None:
                 return await get_channel_safe(event_configs.log_channel_id)  # return event specific log channel
 
@@ -127,29 +128,32 @@ async def _about(ctx):
               description="Sets/unsets/shows the channel currently assigned for logging."
                           "\n Use `set` in the channel you want to designate for logging.",
               usage='<command> [channel]')
-async def logging_channel(ctx):
+async def logging_channel(ctx: commands.Context):
     if ctx.invoked_subcommand is None:
         await ctx.send_help(logging_channel)
 
 
 @logging_channel.command(name="set", brief="Sets which channel the bot will log to.",
                          description="Sets which channel the bot will log to.")
-async def set_logging_channel(ctx, channel: discord.TextChannel):
-    await db.update_log_channel(pool, ctx.guild.id, channel.id)
+async def set_logging_channel(ctx: commands.Context, channel: discord.TextChannel):
+    bot: GGBot = ctx.bot
+    await db.update_log_channel(bot.db_pool, ctx.guild.id, channel.id)
     await ctx.send("Logging channel set to <#{}>".format(channel.id))
 
 
 @logging_channel.command(name="unset", brief="Unsets the log channel", description="Unsets the log channel")
-async def unset_logging_channel(ctx):
-    await db.update_log_channel(pool, ctx.guild.id, log_channel_id=None)
+async def unset_logging_channel(ctx: commands.Context):
+    bot: GGBot = ctx.bot
+    await db.update_log_channel(bot.db_pool, ctx.guild.id, log_channel_id=None)
     await ctx.send("Logging channel has been cleared. "
                    "Gabby Gums will no longer be able to log events unless a new logging channel is set")
 
 
 @logging_channel.command(name="show", brief="Shows what channel is currently configured for logging",
                          description="Shows what channel is currently configured for logging")
-async def show_logging_channel(ctx):
-    _log_channel = await db.get_log_channel(pool, ctx.guild.id)
+async def show_logging_channel(ctx: commands.Context):
+    bot: GGBot = ctx.bot
+    _log_channel = await db.get_log_channel(bot.db_pool, ctx.guild.id)
     if _log_channel is not None:
         await ctx.send("Logging channel is currently set to <#{}>".format(_log_channel))
     else:
@@ -162,29 +166,31 @@ async def show_logging_channel(ctx):
 @client.group(name="ignore_user", brief="Sets which users/bots will be ignored by Gabby Gums",
               description="Sets which users/bots will be ignored by Gabby Gums",
               usage='<command> [Member]')
-async def ignore_user(ctx):
+async def ignore_user(ctx: commands.Context):
     if ctx.invoked_subcommand is None:
         await ctx.send_help(ignore_user)
 
 
 @ignore_user.command(name="list", brief="Lists which users are currently ignored.")
-async def _list(ctx):
+async def _list(ctx: commands.Context):
     await ctx.send("The following users are being ignored by Gabby Gums:")
-    # TODO: Utilize db.get_ignored_users
-    _ignored_users = await db.get_ignored_users(pool, ctx.guild.id)
+    bot: GGBot = ctx.bot
+    _ignored_users = await db.get_ignored_users(bot.db_pool, ctx.guild.id)
     for member_id in _ignored_users:
         await ctx.send("<@{}>".format(member_id))
 
 
 @ignore_user.command(name="add", brief="Add a new member to be ignored")
-async def add(ctx, member: discord.Member):
-    await db.add_ignored_user(pool, ctx.guild.id, member.id)
+async def add(ctx: commands.Context, member: discord.Member):
+    bot: GGBot = ctx.bot
+    await db.add_ignored_user(bot.db_pool, ctx.guild.id, member.id)
     await ctx.send("<@{}> - {}#{} has been ignored.".format(member.id, member.name, member.discriminator))
 
 
 @ignore_user.command(name="remove", brief="Stop ignoring a member")
-async def remove(ctx, member: discord.Member):
-    await db.remove_ignored_user(pool, ctx.guild.id, member.id)
+async def remove(ctx: commands.Context, member: discord.Member):
+    bot: GGBot = ctx.bot
+    await db.remove_ignored_user(bot.db_pool, ctx.guild.id, member.id)
     await ctx.send("<@{}> - {}#{} is no longer being ignored.".format(member.id, member.name, member.discriminator))
 
 
@@ -194,14 +200,15 @@ async def remove(ctx, member: discord.Member):
 @client.group(name="ignore_channel", brief="Sets which channels will be ignored by Gabby Gums",
               description="Sets which channels will be ignored by Gabby Gums",
               usage='<command> [channel]')
-async def ignore_channel(ctx):
+async def ignore_channel(ctx: commands.Context):
     if ctx.invoked_subcommand is None:
         await ctx.send_help(ignore_channel)
 
 
 @ignore_channel.command(name="list", brief="Lists which channels are currently ignored.")
-async def _list(ctx):
-    _ignored_channels = await db.get_ignored_channels(pool, ctx.guild.id)
+async def _list(ctx: commands.Context):
+    bot: GGBot = ctx.bot
+    _ignored_channels = await db.get_ignored_channels(bot.db_pool, ctx.guild.id)
     if len(_ignored_channels) > 0:
         await ctx.send("The following channels are being ignored by Gabby Gums:")
         for channel_id in _ignored_channels:
@@ -211,14 +218,16 @@ async def _list(ctx):
 
 
 @ignore_channel.command(name="add", brief="Add a new channel to be ignored")
-async def add(ctx, channel: discord.TextChannel):
-    await db.add_ignored_channel(pool, ctx.guild.id, channel.id)
+async def add(ctx: commands.Context, channel: discord.TextChannel):
+    bot: GGBot = ctx.bot
+    await db.add_ignored_channel(bot.db_pool, ctx.guild.id, channel.id)
     await ctx.send("<#{}> has been ignored.".format(channel.id))
 
 
 @ignore_channel.command(name="remove", brief="Stop ignoring a channel")
-async def remove(ctx, channel: discord.TextChannel):
-    await db.remove_ignored_channel(pool, ctx.guild.id, channel.id)
+async def remove(ctx: commands.Context, channel: discord.TextChannel):
+    bot: GGBot = ctx.bot
+    await db.remove_ignored_channel(bot.db_pool, ctx.guild.id, channel.id)
     await ctx.send("<#{}> is no longer being ignored.".format(channel.id))
 
 
@@ -232,14 +241,15 @@ async def remove(ctx, channel: discord.TextChannel):
                           "this is not true behind the scenes. "
                           "As such you must be sure to match the capitalism to be the same as when you created it.",
               usage='<command> [category]')
-async def ignore_category(ctx):
+async def ignore_category(ctx: commands.Context):
     if ctx.invoked_subcommand is None:
         await ctx.send_help(ignore_category)
 
 
 @ignore_category.command(name="list", brief="Lists which categories are currently ignored.")
-async def list_categories(ctx):
-    _ignored_categories = await db.get_ignored_categories(pool, ctx.guild.id)
+async def list_categories(ctx: commands.Context):
+    bot: GGBot = ctx.bot
+    _ignored_categories = await db.get_ignored_categories(bot.db_pool, ctx.guild.id)
     if len(_ignored_categories) > 0:
         await ctx.send("The following categories are being ignored by Gabby Gums:")
         for category_id in _ignored_categories:
@@ -249,14 +259,16 @@ async def list_categories(ctx):
 
 
 @ignore_category.command(name="add", brief="Add a new category to be ignored")
-async def add_category(ctx, *, category: discord.CategoryChannel):
-    await db.add_ignored_category(pool, ctx.guild.id, category.id)
+async def add_category(ctx: commands.Context, *, category: discord.CategoryChannel):
+    bot: GGBot = ctx.bot
+    await db.add_ignored_category(bot.db_pool, ctx.guild.id, category.id)
     await ctx.send("<#{}> has been ignored.".format(category.id))
 
 
 @ignore_category.command(name="remove", brief="Stop ignoring a category")
-async def remove_category(ctx, *, category: discord.CategoryChannel):
-    await db.remove_ignored_category(pool, ctx.guild.id, category.id)
+async def remove_category(ctx: commands.Context, *, category: discord.CategoryChannel):
+    bot: GGBot = ctx.bot
+    await db.remove_ignored_category(bot.db_pool, ctx.guild.id, category.id)
     await ctx.send("<#{}> is no longer being ignored.".format(category.id))
 
 
@@ -266,7 +278,7 @@ async def remove_category(ctx, *, category: discord.CategoryChannel):
 @client.group(name="config_event", brief="Allows for setting per event log channels and/or disabling specific events from being logged.",
               description="Allows for setting per event log channels and/or disabling specific events from being logged.",
               usage='<command> [channel]')
-async def config_event(ctx):
+async def config_event(ctx: commands.Context):
     if ctx.invoked_subcommand is None:
 
         help_msg = "This command allows for setting per event log channels and/or disabling specific events from being logged.\n" \
@@ -282,21 +294,22 @@ async def config_event(ctx):
 
 
 @config_event.command(name="channel")
-async def _channel(ctx, event_type: str, channel: Optional[discord.TextChannel] = None):
+async def _channel(ctx: commands.Context, event_type: str, channel: Optional[discord.TextChannel] = None):
+    bot: GGBot = ctx.bot
     event_types = GuildConfigs.GuildLoggingConfig().available_event_types()
     event_type = event_type.lower()
     if event_type not in event_types:
         await ctx.send("{} is not a valid event type!\n The following event types are configurable:``` {}```".format(event_type, ", ".join(event_types)))
         return
     else:
-        guild_event_configs = await db.get_server_log_configs(pool, ctx.guild.id)
+        guild_event_configs = await db.get_server_log_configs(bot.db_pool, ctx.guild.id)
         channel_id = channel.id if channel is not None else None
 
         if guild_event_configs[event_type] is not None:
             guild_event_configs[event_type].log_channel_id = channel_id
         else:
             guild_event_configs[event_type] = GuildConfigs.EventConfig(log_channel_id=channel_id)
-        await db.set_server_log_configs(pool, ctx.guild.id, guild_event_configs)
+        await db.set_server_log_configs(bot.db_pool, ctx.guild.id, guild_event_configs)
         if channel is not None:
             await ctx.send("{} messages will now be logged to #{}".format(event_type, channel.name))
         else:  # TODO: Add the default log channels name to the following message.
@@ -304,7 +317,8 @@ async def _channel(ctx, event_type: str, channel: Optional[discord.TextChannel] 
 
 
 @config_event.command(name="enabled")
-async def enabled(ctx, event_type: str, is_enabled: bool):
+async def enabled(ctx: commands.Context, event_type: str, is_enabled: bool):
+    bot: GGBot = ctx.bot
     event_types = GuildConfigs.GuildLoggingConfig().available_event_types()
     event_type = event_type.lower()
     if event_type not in event_types:
@@ -312,13 +326,13 @@ async def enabled(ctx, event_type: str, is_enabled: bool):
             event_type, ", ".join(event_types)))
         return
     else:
-        guild_event_configs = await db.get_server_log_configs(pool, ctx.guild.id)
+        guild_event_configs = await db.get_server_log_configs(bot.db_pool, ctx.guild.id)
 
         if guild_event_configs[event_type] is not None:
             guild_event_configs[event_type].enabled = is_enabled
         else:
             guild_event_configs[event_type] = GuildConfigs.EventConfig(enabled=is_enabled)
-        await db.set_server_log_configs(pool, ctx.guild.id, guild_event_configs)
+        await db.set_server_log_configs(bot.db_pool, ctx.guild.id, guild_event_configs)
         if is_enabled is True:
             await ctx.send("{} messages will now be logged.".format(event_type))
         else:
@@ -332,10 +346,11 @@ async def enabled(ctx, event_type: str, is_enabled: bool):
 @commands.guild_only()
 @client.group(name="reset",
               brief="**Completely resets** all configuration and stored data for your server. **Caution, this can not be undone!**")
-async def reset_server_info(ctx):
+async def reset_server_info(ctx: commands.Context):
     # TODO: Add warning and confirmation
-    await db.remove_server(pool, ctx.guild.id)
-    await db.add_server(pool, ctx.guild.id, ctx.guild.name)
+    bot: GGBot = ctx.bot
+    await db.remove_server(bot.db_pool, ctx.guild.id)
+    await db.add_server(bot.db_pool, ctx.guild.id, ctx.guild.name)
     await ctx.send("**ALL Settings have been reset!**")
 
 
@@ -346,7 +361,7 @@ async def reset_server_info(ctx):
               brief="Allows for naming invites for easier identification and listing details about them.",
               description="Allows for naming invites for easier identification and listing details about them.",
               usage='<command> [Invite ID]')
-async def invite_manage(ctx):
+async def invite_manage(ctx: commands.Context):
     if not ctx.guild.me.guild_permissions.manage_guild:
         await ctx.send("⚠ Gabby gums needs the **Manage Server** permission for invite tracking.")
         return
@@ -356,7 +371,7 @@ async def invite_manage(ctx):
 
 
 @invite_manage.command(name="list", brief="Lists the invites in the server and if they have a defined name.")
-async def _list_invites(ctx):
+async def _list_invites(ctx: commands.Context):
     if ctx.guild.me.guild_permissions.manage_guild:
         await update_invite_cache(ctx.guild)  # refresh the invite cache.
         invites: db.StoredInvites = await get_stored_invites(ctx.guild.id)
@@ -377,18 +392,20 @@ async def _list_invites(ctx):
 
 @invite_manage.command(name="name", brief="Lets you give an invite a nickname so it can be easier to identify.",
                        usage='invites name [Invite ID] [Invite Nickname]')
-async def _name_invite(ctx, invite_id: discord.Invite, nickname: str = None):
+async def _name_invite(ctx: commands.Context, invite_id: discord.Invite, nickname: str = None):
+    bot: GGBot = ctx.bot
     if ctx.guild.me.guild_permissions.manage_guild:
         await update_invite_cache(ctx.guild)  # refresh the invite cache.
-        await db.update_invite_name(pool, ctx.guild.id, invite_id.id, invite_name=nickname)
+        await db.update_invite_name(bot.db_pool, ctx.guild.id, invite_id.id, invite_name=nickname)
         await ctx.send("{} has been given the nickname: {}".format(invite_id.id, nickname))
 
 
 @invite_manage.command(name="unname", brief="Removes the name from an invite.")
-async def _unname_invite(ctx, invite_id: discord.Invite):
+async def _unname_invite(ctx: commands.Context, invite_id: discord.Invite):
+    bot: GGBot = ctx.bot
     if ctx.guild.me.guild_permissions.manage_guild:
         await update_invite_cache(ctx.guild)  # refresh the invite cache.
-        await db.update_invite_name(pool, ctx.guild.id, invite_id.id)
+        await db.update_invite_name(bot.db_pool, ctx.guild.id, invite_id.id)
         await ctx.send("{} no longer has a nickname.".format(invite_id.id))
 
 
@@ -396,7 +413,7 @@ async def _unname_invite(ctx, invite_id: discord.Invite):
 @client.command(name='bot_invite',
                 brief='Get an invite for Gabby Gums.',
                 description='get an invite for Gabby Gums.')
-async def invite_link_command(ctx):
+async def invite_link_command(ctx: commands.Context):
     # Todo: Calculate permissions instead of hardcoding and use discord.utils.oauth_url
     invite = "https://discordapp.com/oauth2/authorize?client_id={}&scope=bot&permissions={}".format(client.user.id, 380096)
     await ctx.send("Here's a link to invite Gabby Gums to your server:")
@@ -406,10 +423,11 @@ async def invite_link_command(ctx):
 @client.command(name='ping',
                 brief='Shows the current bot latency.',
                 description='Shows the current bot latency.')
-async def ping_command(ctx):
+async def ping_command(ctx: commands.Context):
 
+    bot: GGBot = ctx.bot
     db_start = time.perf_counter()
-    await db.get_log_channel(pool, ctx.guild.id)  # Get the log to test DB speed
+    await db.get_log_channel(bot.db_pool, ctx.guild.id)  # Get the log to test DB speed
     db_end = time.perf_counter()
 
     embed = discord.Embed(title="Pinging...", description=" \n ", color=0x00b7fa)
@@ -428,7 +446,7 @@ async def ping_command(ctx):
 @client.command(name='stats',
                 brief='Shows various stats such as CPU, memory usage, disk space usage, and more.',
                 description='Shows various stats such as CPU, memory usage, disk space usage, and more.')
-async def top_command(ctx):
+async def top_command(ctx: commands.Context):
 
     def folder_size(path='.'):
         total = 0
@@ -438,6 +456,8 @@ async def top_command(ctx):
             elif entry.is_dir():
                 total += folder_size(entry.path)
         return total
+
+    bot: GGBot = ctx.bot
 
     pid = os.getpid()
     py = psutil.Process(pid)
@@ -449,7 +469,7 @@ async def top_command(ctx):
     image_cache_du_used = folder_size("./image_cache/") / 1024 / 1024
     num_of_files_in_cache = sum([len(files) for r, d, files in os.walk("./image_cache/")])
 
-    num_of_db_cached_messages = await db.get_number_of_rows_in_messages(pool)
+    num_of_db_cached_messages = await db.get_number_of_rows_in_messages(bot.db_pool)
     try:
         load_average = os.getloadavg()
     except AttributeError:  # Get load avg is not available on windows
@@ -468,8 +488,11 @@ async def top_command(ctx):
                 brief="Checks for any possible permission or configuration problems that could interfere with the operations of Gabby Gums",
                 description="Checks for any possible permission or configuration problems that could interfere with the operations of Gabby Gums",
                 )
-async def verify_permissions(ctx, guild_id: Optional[str] = None):
+async def verify_permissions(ctx: commands.Context, guild_id: Optional[str] = None):
     # TODO: Restrict usage
+
+    bot: GGBot = ctx.bot
+
     if guild_id is not None:
         guild: discord.Guild = client.get_guild(int(guild_id.strip()))
     else:
@@ -536,14 +559,14 @@ async def verify_permissions(ctx, guild_id: Optional[str] = None):
         noncrit_msg = noncrit_msg + "\n".join(perms['non-crit'])
         embed.add_field(name="Non-Critical Permissions Problems", value=noncrit_msg, inline=True)
 
-    guild_logging_channel = await get_event_or_guild_logging_channel(guild.id)  # TODO: List event specific configs
+    guild_logging_channel = await get_event_or_guild_logging_channel(bot.db_pool, guild.id)  # TODO: List event specific configs
     if guild_logging_channel is not None:
         embed.add_field(name="Currently Configured Log Channel ", value="#{}".format(guild_logging_channel.name), inline=True)
     else:
         embed.add_field(name="Currently Configured Log Channel ", value="**NONE**", inline=True)
 
     channels_msg = ""
-    _ignored_channels = await db.get_ignored_channels(pool, guild.id)
+    _ignored_channels = await db.get_ignored_channels(bot.db_pool, guild.id)
     if len(_ignored_channels) > 0:
         for channel_id in _ignored_channels:
             ignored_channel = await get_channel_safe(channel_id)
@@ -552,7 +575,7 @@ async def verify_permissions(ctx, guild_id: Optional[str] = None):
     else:
         embed.add_field(name="Channels Currently Being Ignored ", value="**NONE**", inline=True)
 
-    _ignored_categories = await db.get_ignored_categories(pool, guild.id)
+    _ignored_categories = await db.get_ignored_categories(bot.db_pool, guild.id)
     if len(_ignored_categories) > 0:
         categories_id_msg_fragments = [f"<#{category_id}>" for category_id in _ignored_categories]
         categories_msg = "\n".join(categories_id_msg_fragments)
@@ -571,10 +594,11 @@ async def verify_permissions(ctx, guild_id: Optional[str] = None):
 # ----- Debugging Channel Commands ----- #
 @commands.is_owner()
 @client.command(name="dump")
-async def dump(ctx, table: str):
+async def dump(ctx: commands.Context, table: str):
+    bot: GGBot = ctx.bot
     await ctx.send("DB Dump for {}".format(table))
     table_msg = "```python\n"
-    rows = await db.fetch_full_table(pool, table)
+    rows = await db.fetch_full_table(bot.db_pool, table)
 
     for row in rows:
         table_msg = table_msg + str(row) + "\n"
@@ -584,9 +608,10 @@ async def dump(ctx, table: str):
 
 @commands.is_owner()
 @client.command(name="messages")
-async def past_messages(ctx, hours: int, max: int = 15):
+async def past_messages(ctx: commands.Context, hours: int, max: int = 15):
     # This command is limited only to servers that we are Admin/Owner of for privacy reasons.
-    rows = await db.get_cached_messages_older_than(pool, hours)
+    bot: GGBot = ctx.bot
+    rows = await db.get_cached_messages_older_than(bot.db_pool, hours)
     rows = rows[len(rows)-max:len(rows)] if len(rows) > max else rows
     await ctx.send("Dumping the last {} records over the last {} hours".format(len(rows), hours))
     for row in rows:
@@ -598,7 +623,7 @@ async def past_messages(ctx, hours: int, max: int = 15):
 
 @commands.is_owner()
 @client.command(name="test")
-async def test_cmd(ctx):
+async def test_cmd(ctx: commands.Context):
     pass
 
 
@@ -627,6 +652,7 @@ async def on_command_error(ctx, error):
 @client.event
 async def on_message(message: discord.Message):
 
+
     if message.author.id != client.user.id:  # Don't log our own messages.
 
         message_contents = message.content if message.content != '' else None
@@ -650,7 +676,7 @@ async def on_message(message: discord.Message):
                 attachments.append(attachment_filename)
 
         if message_contents is not None or attachments is not None:
-            await db.cache_message(pool, message.guild.id, message.id, message.author.id, message_content=message_contents,
+            await db.cache_message(client.db_pool, message.guild.id, message.id, message.author.id, message_content=message_contents,
                                    attachments=attachments)
 
     await client.process_commands(message)
@@ -686,26 +712,26 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
 
     async def cleanup_message_cache():
         if db_cached_message is not None:
-            await db.delete_cached_message(pool, payload.guild_id, db_cached_message.message_id)
+            await db.delete_cached_message(client.db_pool, payload.guild_id, db_cached_message.message_id)
 
     if payload.guild_id is None:
         return  # We are in a DM, Don't log the message
 
     # Get the cached msg from the DB (if possible)
-    db_cached_message = await db.get_cached_message(pool, payload.guild_id, payload.message_id)
+    db_cached_message = await db.get_cached_message(client.db_pool, payload.guild_id, payload.message_id)
 
-    log_channel = await get_event_or_guild_logging_channel(payload.guild_id, event_type)
+    log_channel = await get_event_or_guild_logging_channel(client.db_pool, payload.guild_id, event_type)
     if log_channel is None:
         # Silently fail if no log channel is configured.
         await cleanup_message_cache()
         return
 
-    if await is_channel_ignored(pool, payload.guild_id, payload.channel_id):
+    if await is_channel_ignored(client.db_pool, payload.guild_id, payload.channel_id):
         await cleanup_message_cache()
         return
 
     channel: discord.TextChannel = await get_channel_safe(payload.channel_id)
-    if await is_category_ignored(pool, payload.guild_id, channel.category):
+    if await is_category_ignored(client.db_pool, payload.guild_id, channel.category):
         await cleanup_message_cache()
         return
 
@@ -716,7 +742,7 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
         msg = payload.cached_message.content if payload.cached_message is not None else db_cached_message.content
         author = payload.cached_message.author if payload.cached_message is not None else client.get_user(db_cached_message.user_id)
 
-        if author is not None and (client.user.id == author.id or await is_user_ignored(pool, payload.guild_id, author.id)):
+        if author is not None and (client.user.id == author.id or await is_user_ignored(client.db_pool, payload.guild_id, author.id)):
             await cleanup_message_cache()
             return
     else:
@@ -772,7 +798,7 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
         if "guild_id" not in payload.data:
             return  # We are in a DM, Don't log the message
 
-        db_cached_message = await db.get_cached_message(pool, payload.data['guild_id'], payload.message_id)
+        db_cached_message = await db.get_cached_message(client.db_pool, payload.data['guild_id'], payload.message_id)
 
         after_msg = payload.data['content']
         guild_id = int(payload.data["guild_id"])
@@ -797,14 +823,14 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
             # The message content has not changed. This is a pin/unpin, embed edit (which would be from a bot or discord)
             return
 
-        if await is_user_ignored(pool, guild_id, author_id):
+        if await is_user_ignored(client.db_pool, guild_id, author_id):
             return
 
-        if await is_channel_ignored(pool, guild_id, channel_id):
+        if await is_channel_ignored(client.db_pool, guild_id, channel_id):
             return
 
         channel: discord.TextChannel = await get_channel_safe(channel_id)
-        if await is_category_ignored(pool, guild_id, channel.category):
+        if await is_category_ignored(client.db_pool, guild_id, channel.category):
             return
 
         if author is None:
@@ -817,7 +843,7 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
 
         embed = embeds.edited_message(author_id, author.name, author.discriminator, channel_id, before_msg, after_msg, message_id, guild_id)
 
-        log_channel = await get_event_or_guild_logging_channel(guild_id, event_type)
+        log_channel = await get_event_or_guild_logging_channel(client.db_pool, guild_id, event_type)
         if log_channel is None:
             # Silently fail if no log channel is configured.
             return
@@ -826,11 +852,11 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
         await log_channel.send(embed=embed)
 
         if db_cached_message is not None:
-            await db.update_cached_message(pool, payload.data['guild_id'], payload.message_id, after_msg)
+            await db.update_cached_message(client.db_pool, payload.data['guild_id'], payload.message_id, after_msg)
 
 
 async def get_stored_invites(guild_id: int) -> db.StoredInvites:
-    stored_invites = await db.get_invites(pool, guild_id)
+    stored_invites = await db.get_invites(client.db_pool, guild_id)
     return stored_invites
 
 
@@ -844,7 +870,7 @@ async def update_invite_cache(guild: discord.Guild, invites: Optional[List[disco
             invites: List[discord.Invite] = await guild.invites()
 
         for invite in invites:
-            await db.store_invite(pool, guild.id, invite.id, invite.uses)
+            await db.store_invite(client.db_pool, guild.id, invite.id, invite.uses)
 
         if stored_invites is None:
             stored_invites = await get_stored_invites(guild.id)
@@ -870,7 +896,7 @@ async def remove_invalid_invites(guild_id: int, current_invites: List[discord.In
     for stored_invite in stored_invites.invites:
         current_invite = search_for_invite(current_invites, stored_invite.invite_id)
         if current_invite is None:
-            await db.remove_invite(pool, guild_id, stored_invite.invite_id)
+            await db.remove_invite(client.db_pool, guild_id, stored_invite.invite_id)
 
 
 async def find_used_invite(member: discord.Member) -> Optional[db.StoredInvite]:
@@ -952,7 +978,7 @@ async def on_member_join(member: discord.Member):
     else:
         embed = embeds.member_join(member, None, manage_guild=False)
 
-    log_channel = await get_event_or_guild_logging_channel(member.guild.id, event_type)
+    log_channel = await get_event_or_guild_logging_channel(client.db_pool, member.guild.id, event_type)
     if log_channel is None:
         # Silently fail if no log channel is configured.
         return
@@ -965,7 +991,7 @@ async def on_member_remove(member: discord.Member):
     event_type = "member_leave"
 
     embed = embeds.member_leave(member)
-    log_channel = await get_event_or_guild_logging_channel(member.guild.id, event_type)
+    log_channel = await get_event_or_guild_logging_channel(client.db_pool, member.guild.id, event_type)
     if log_channel is None:
         # Silently fail if no log channel is configured.
         return
@@ -987,7 +1013,7 @@ async def on_member_update(before: discord.Member, after: discord.Member):
 
     if before.nick != after.nick:
 
-        log_channel = await get_event_or_guild_logging_channel(after.guild.id, event_type_nick)
+        log_channel = await get_event_or_guild_logging_channel(client.db_pool, after.guild.id, event_type_nick)
         if log_channel is None:
             # Silently fail if no log channel is configured.
             return
@@ -1001,7 +1027,7 @@ async def on_guild_join(guild: discord.Guild):
     # Todo: Move DB creation to a command.
     #  Having it here is fragile as a user could add the bot and on_guild_join may not ever fire if the bot is down at the time.
     # create an entry for the server in the database
-    await db.add_server(pool, guild.id, guild.name)
+    await db.add_server(client.db_pool, guild.id, guild.name)
 
     await update_invite_cache(guild)
 
@@ -1022,11 +1048,11 @@ async def on_guild_remove(guild: discord.Guild):
     logging.warning(log_msg)
 
     if 'error_log_channel' not in config:
-        await db.remove_server(pool, guild.id)
+        await db.remove_server(client.db_pool, guild.id)
         return
     error_log_channel = client.get_channel(config['error_log_channel'])
     await error_log_channel.send(log_msg)
-    await db.remove_server(pool, guild.id)
+    await db.remove_server(client.db_pool, guild.id)
 
 
 @client.event
@@ -1046,9 +1072,10 @@ if __name__ == '__main__':
     with open('config.json') as json_data_file:
         config = json.load(json_data_file)
 
-    pool = asyncio.get_event_loop().run_until_complete(db.create_db_pool(config['db_uri']))
-    asyncio.get_event_loop().run_until_complete(db.create_tables(pool))
+    db_pool: asyncpg.pool.Pool = asyncio.get_event_loop().run_until_complete(db.create_db_pool(config['db_uri']))
+    asyncio.get_event_loop().run_until_complete(db.create_tables(db_pool))
 
+    client.db_pool = db_pool
     client.command_prefix = config['bot_prefix']
     client.run(config['token'])
 
