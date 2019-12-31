@@ -137,7 +137,10 @@ def member_join(member: discord.Member, invite: Optional[StoredInvite], manage_g
 
     embed.set_author(name="New Member Joined!!!",
                      icon_url="https://www.emoji.co.uk/files/twitter-emojis/objects-twitter/11031-inbox-tray.png")
-    embed.set_thumbnail(url=member.avatar_url)
+
+    # Need to use format other than WebP for image to display on iOS. (I think this is a recent discord bug.)
+    ios_compatible_avatar_url = member.avatar_url_as(static_format="png")
+    embed.set_thumbnail(url=ios_compatible_avatar_url)
 
     embed.add_field(name="Info:",
                     value="{} has joined the server!!!".format(member.display_name),
@@ -186,7 +189,10 @@ def member_leave(member: discord.Member) -> discord.Embed:
 
     embed.set_author(name="Member Left 😭",
                      icon_url="https://www.emoji.co.uk/files/mozilla-emojis/objects-mozilla/11928-outbox-tray.png")
-    embed.set_thumbnail(url=member.avatar_url)
+
+    # Need to use format other than WebP for image to display on iOS. (I think this is a recent discord bug.)
+    ios_compatible_avatar_url = member.avatar_url_as(static_format="png")
+    embed.set_thumbnail(url=ios_compatible_avatar_url)
     embed.add_field(name="Info:",
                     value="{} has left the server 😭.".format(member.display_name),
                     inline=False)
