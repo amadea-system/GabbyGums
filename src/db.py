@@ -258,17 +258,22 @@ class CachedMessage:
     ts: datetime
     content: Optional[str]
     attachments: Optional[List[str]]
+    webhook_author_name: Optional[str]
+    system_pkid: Optional[str]
+    member_pkid: Optional[str]
+    pk_system_account_id: Optional[int]
 
 
 @db_deco
 async def cache_message(pool, sid: int, message_id: int, author_id: int, message_content: Optional[str] = None,
-                        attachments: Optional[List[str]] = None):
+                        attachments: Optional[List[str]] = None, webhook_author_name: Optional[str] = None,
+                        system_pkid: Optional[str] = None, member_pkid: Optional[str] = None, pk_system_account_id: Optional[int] = None):
     async with pool.acquire() as conn:
-        await conn.execute("INSERT INTO messages(server_id, message_id, user_id, content, attachments) VALUES($1, $2, $3, $4, $5)", sid, message_id, author_id, message_content, attachments)
+        await conn.execute("INSERT INTO messages(server_id, message_id, user_id, content, attachments, webhook_author_name) VALUES($1, $2, $3, $4, $5, $6)", sid, message_id, author_id, message_content, attachments, webhook_author_name)
 
 
 @db_deco
-async def get_cached_message(pool, sid: int, message_id: int) -> CachedMessage:
+async def get_cached_message(pool, sid: int, message_id: int) -> Optional[CachedMessage]:
     async with pool.acquire() as conn:
         row = await conn.fetchrow("SELECT * FROM messages WHERE message_id = $1", message_id)
         return CachedMessage(**row) if row is not None else None
@@ -278,6 +283,14 @@ async def get_cached_message(pool, sid: int, message_id: int) -> CachedMessage:
 async def update_cached_message(pool, sid: int, message_id: int, new_content: str):
     async with pool.acquire() as conn:
         await conn.execute("UPDATE messages SET content = $1 WHERE message_id = $2", new_content, message_id)
+
+
+@db_deco
+async def update_cached_message_pk_details(pool, sid: int, message_id: int, system_pkid: str, member_pkid: str,
+                                           pk_system_account_id: int):
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE messages SET system_pkid = $1, member_pkid = $2, pk_system_account_id = $3 WHERE message_id = $4",
+                           system_pkid, member_pkid, pk_system_account_id, message_id)
 
 
 @db_deco
@@ -383,14 +396,23 @@ async def create_tables(pool):
                        ''')
 
         # Create message cache table
+        # Will need to execute the following to alter the existing production table:
+        # ALTER TABLE messages ADD COLUMN webhook_author_name TEXT DEFAULT NULL;
+        # ALTER TABLE messages ADD COLUMN system_pkid TEXT DEFAULT NULL;
+        # ALTER TABLE messages ADD COLUMN member_pkid TEXT DEFAULT NULL;
+        # ALTER TABLE messages ADD COLUMN pk_system_account_id BIGINT DEFAULT NULL;
         await conn.execute('''
                            CREATE TABLE if not exists messages(
-                               message_id   BIGINT PRIMARY KEY,
-                               server_id    BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
-                               user_id      BIGINT NOT NULL,
-                               content      TEXT DEFAULT NULL,
-                               attachments  TEXT[] DEFAULT NULL,
-                               ts           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                               message_id           BIGINT PRIMARY KEY,
+                               server_id            BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
+                               user_id              BIGINT NOT NULL,
+                               content              TEXT DEFAULT NULL,
+                               attachments          TEXT[] DEFAULT NULL,
+                               ts                   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                               webhook_author_name  TEXT DEFAULT NULL,
+                               system_pkid          TEXT DEFAULT NULL,
+                               member_pkid          TEXT DEFAULT NULL,
+                               pk_system_account_id BIGINT DEFAULT NULL
                            )
                        ''')
 

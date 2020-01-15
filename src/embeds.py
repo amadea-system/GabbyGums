@@ -5,10 +5,10 @@
 import discord
 from datetime import datetime
 from typing import Optional, Union
-from db import StoredInvite
+from db import StoredInvite, CachedMessage
+import logging
 
-
-# TODO: Make these all async?
+log = logging.getLogger(__name__)
 
 
 def split_message(message: str) -> (str, str):
@@ -82,27 +82,53 @@ def edited_message(author_id, author_name: str, author_discrim, channel_id, befo
     return embed
 
 
-def deleted_message(message_content: str, author: Optional[discord.Member], channel_id: int, message_id: int = -1,
+def deleted_message(message_content: Optional[str], author: Optional[discord.Member], channel_id: int, message_id: int = -1,
+                    webhook_info: Optional[CachedMessage] = None, pk_system_owner: Optional[discord.Member] = None,
                     cached: bool = True) -> discord.Embed:
 
+    # If the webhook_info is none, create dummy object to make if's neater
+    if webhook_info is None:
+        webhook_info = CachedMessage(None, None, None, None, None, None, None, None, None, None)
+
     if cached:
+        pk_id_msg = ""
+        if webhook_info.member_pkid is not None or webhook_info.system_pkid is not None:
+            s = '\u205f'  # Medium Mathematical Space
+            pk_id_msg = f"{s}\n{s}\nSystem ID: {s}{s}{s}**{webhook_info.system_pkid}** \nMember ID: {s}**{webhook_info.member_pkid}**"
+            log.info("pk_id_msg set")
+
         if author is None:
-            description_text = info_author = "Uncached User"
+            log.info("Author is None")
+            # We have NO info on the author of the message.
+            if webhook_info.webhook_author_name is not None:
+                log.info("Webhook Author is NOT None")
+                description_text = f"{webhook_info.webhook_author_name}{pk_id_msg}"
+                info_author = f"**{webhook_info.webhook_author_name}**"
+            else:
+                log.info("Webhook Author is None")
+                description_text = info_author = "Uncached User"
+
         elif author.discriminator == "0000":
-            description_text = "{}#{}".format(author.name, author.discriminator)
-            info_author = "{}#{}".format(author.name, author.discriminator)
+            description_text = f"{author.name}{pk_id_msg}"
+            info_author = f"**{author.name}**"
         else:
-            description_text = "<@{}> - {}#{}".format(author.id, author.name, author.discriminator)
-            info_author = "<@{}>".format(author.id)
+            description_text = f"<@{author.id}> - {author.name}#{author.discriminator}"
+            info_author = f"<@{author.id}>"
 
         embed = discord.Embed(title="Deleted Message",
                               description=description_text,
                               color=0x9b59b6,
                               timestamp=datetime.utcnow())
         embed.set_thumbnail(url="http://i.imgur.com/fJpAFgN.png")
+
         embed.add_field(name="Info:",
                         value="A message by {}, was deleted in <#{}>".format(info_author, channel_id),
                         inline=False)
+
+        if pk_system_owner is not None:
+            embed.add_field(name="Linked Discord Account:",
+                            value=f"<@{pk_system_owner.id}> - {pk_system_owner.name}#{pk_system_owner.discriminator}",
+                            inline=False)
 
         if len(message_content) > 1024:
             msg_cont_1, msg_cont_2 = split_message(message_content)
@@ -112,7 +138,7 @@ def deleted_message(message_content: str, author: Optional[discord.Member], chan
             embed.add_field(name="Message:", value=message_content, inline=False)
 
         if author is not None:
-            embed.set_footer(text="User ID: {}".format(author.id))
+            embed.set_footer(text=f"User ID: {author.id}")
 
         return embed
     else:

@@ -9,7 +9,7 @@ import logging
 import traceback
 import asyncio
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 import psutil
 import asyncpg
@@ -652,7 +652,11 @@ async def past_messages(ctx: commands.Context, hours: int, max: int = 15):
     rows = rows[len(rows)-max:len(rows)] if len(rows) > max else rows
     await ctx.send("Dumping the last {} records over the last {} hours".format(len(rows), hours))
     for row in rows:
-        log_msg = "mid: {}, sid: {}, uid: {}, ts: {}, message: \n**{}**".format(row['message_id'], row['server_id'], row['user_id'], row['ts'].strftime("%b %d, %Y, %I:%M:%S %p UTC"), row['content'])
+        log_msg = f"mid: {row['message_id']}, sid: {row['server_id']}, uid: {row['user_id']}, " \
+                  f"ts: {row['ts'].strftime('%b %d, %Y, %I:%M:%S %p UTC')} webhookun: {row['webhook_author_name']}, " \
+                  f"system_pkid: {row['system_pkid']}, member_pkid: {row['member_pkid']}, " \
+                  f"PK Account: <@{row['pk_system_account_id']}> message: \n**{row['content']}**"
+
         logging.info(log_msg)
         await utils.send_long_msg(ctx, log_msg)
         await asyncio.sleep(1)
@@ -689,7 +693,6 @@ async def on_command_error(ctx, error):
 @client.event
 async def on_message(message: discord.Message):
 
-
     if message.author.id != client.user.id:  # Don't log our own messages.
 
         message_contents = message.content if message.content != '' else None
@@ -713,8 +716,9 @@ async def on_message(message: discord.Message):
                 attachments.append(attachment_filename)
 
         if message_contents is not None or attachments is not None:
+            webhook_author_name = message.author.display_name if message.webhook_id is not None else None
             await db.cache_message(client.db_pool, message.guild.id, message.id, message.author.id, message_content=message_contents,
-                                   attachments=attachments)
+                                   attachments=attachments, webhook_author_name=webhook_author_name)
 
     await client.process_commands(message)
 
@@ -747,6 +751,7 @@ async def on_error(event_name, *args):
 async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
     event_type = "message_delete"
 
+    # Exit function to ensure message is removed from the cache.
     async def cleanup_message_cache():
         if db_cached_message is not None:
             await db.delete_cached_message(client.db_pool, payload.guild_id, db_cached_message.message_id)
@@ -754,19 +759,15 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
     if payload.guild_id is None:
         return  # We are in a DM, Don't log the message
 
-    # Get the cached msg from the DB (if possible)
+    # Get the cached msg from the DB (if possible). Will be None if msg does not exist in DB
     db_cached_message = await db.get_cached_message(client.db_pool, payload.guild_id, payload.message_id)
 
-    log_channel = await get_event_or_guild_logging_channel(client.db_pool, payload.guild_id, event_type)
-    if log_channel is None:
-        # Silently fail if no log channel is configured.
-        await cleanup_message_cache()
-        return
-
+    # Check if the channel we are in is ignored. If it is, bail
     if await is_channel_ignored(client.db_pool, payload.guild_id, payload.channel_id):
         await cleanup_message_cache()
         return
 
+    # Check if the category we are in is ignored. If it is, bail
     channel: discord.TextChannel = await get_channel_safe(payload.channel_id)
     if await is_category_ignored(client.db_pool, payload.guild_id, channel.category):
         await cleanup_message_cache()
@@ -774,15 +775,19 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
 
     channel_id = payload.channel_id
 
+    # Check to see if we got results from the memory or DB cache.
     if payload.cached_message is not None or db_cached_message is not None:
         cache_exists = True
+        # Pull the message content and author from the Memory/DB Cache. Favor the Memory cache over the DB Cache.
         msg = payload.cached_message.content if payload.cached_message is not None else db_cached_message.content
         author = payload.cached_message.author if payload.cached_message is not None else client.get_user(db_cached_message.user_id)
 
+        # Check if the message is from Gabby Gums or an ignored user. If it is, bail.
         if author is not None and (client.user.id == author.id or await is_user_ignored(client.db_pool, payload.guild_id, author.id)):
             await cleanup_message_cache()
             return
     else:
+        # Message was not in either cache. Set msg and author to None.
         cache_exists = False
         msg = None
         author = None
@@ -791,12 +796,27 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get('https://api.pluralkit.me/msg/{}'.format(payload.message_id)) as r:
-                if r.status == 200:
-                    await cleanup_message_cache()
-                    return  # Message was proxied by PluralKit. Return instead of logging message
+                if r.status == 200:  # We received a valid response from the PK API. The message is probably a pre-proxied message.
+                    # TODO: Remove logging once bugs are worked out.
+                    logging.info(f"Message {payload.message_id} is still on the PK api. updating caches and aborting logging.")
+                    # Convert the JSON response to a dict, Cache the details of the proxied message, and then bail.
+                    pk_response = await r.json()
+                    if verify_message_is_preproxy_message(payload.message_id, pk_response):
+                        # We have confirmed that the message is a pre-proxied message.
+                        await cache_pk_message_details(payload.guild_id, pk_response)
+                        await cleanup_message_cache()
+                        return  # Message was a pre-proxied message deleted by PluralKit. Return instead of logging message.
+
     except aiohttp.ClientError as e:
         logging.warning(
             "Could not connect to PK server with out errors. Assuming message should be logged.\n{}".format(e))
+
+    # Get the servers logging channel.
+    log_channel = await get_event_or_guild_logging_channel(client.db_pool, payload.guild_id, event_type)
+    if log_channel is None:
+        # Silently fail if no log channel is configured.
+        await cleanup_message_cache()
+        return
 
     # Handle any attachments
     attachments = []
@@ -818,13 +838,80 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
     if msg == "":
         msg = "None"
 
+    if db_cached_message is not None and db_cached_message.pk_system_account_id is not None:
+        pk_system_owner = client.get_user(db_cached_message.pk_system_account_id)
+    else:
+        pk_system_owner = None
+
     embed = embeds.deleted_message(message_content=msg, author=author, channel_id=channel_id,
-                                   message_id=payload.message_id, cached=cache_exists)
+                                   message_id=payload.message_id, webhook_info=db_cached_message,
+                                   pk_system_owner=pk_system_owner, cached=cache_exists)
+
     await log_channel.send(embed=embed)
     if len(attachments) > 0:
         await log_channel.send(content="Deleted Attachments:", files=attachments)
 
     await cleanup_message_cache()
+
+
+def verify_message_is_preproxy_message(message_id: int, pk_response: Dict) -> bool:
+    # Compare the proxied msg id reported from the API with this messages id
+    #   to determine if this message is actually a proxyed message.
+    if 'id' in pk_response:  # Message ID (Discord Snowflake) of the proxied message
+        pk_message_id = int(pk_response['id'])
+        if message_id == pk_message_id:
+            # This is a false positive. We actually do need to log the message.
+            return False
+        else:
+            # Message is indeed a preproxied message
+            return True
+    else:
+        # Message is indeed a preproxied message
+        return True
+
+
+
+async def cache_pk_message_details(guild_id: int, pk_response: Dict):
+
+    error_msg = []
+    error_header = '[cache_pk_message_details]: '
+    if 'id' in pk_response:  # Message ID (Discord Snowflake) of the proxied message
+        message_id = int(pk_response['id'])
+    else:
+        # If we can not pull the message ID there is no point in continuing.
+        msg = "'WARNING! 'id' not in PK msg API Data. Aborting JSON Decode!"
+        error_msg.append(msg)
+        logging.warning(msg)
+        await utils.send_error_msg_to_log(client, error_msg, header=f"{error_header}!ERROR!")
+        return
+
+    if 'sender' in pk_response:  # User ID of the account that sent the pre-proxied message. Presumed to be linked to the PK Account
+        sender_discord_id = int(pk_response['sender'])
+    else:
+        sender_discord_id = None
+        msg = "WARNING! 'Sender' not in MSG Data"
+        error_msg.append(msg)
+
+    if 'system' in pk_response and 'id' in pk_response['system']:  # PK System Id
+        system_pk_id = pk_response['system']['id']
+    else:
+        system_pk_id = None
+        msg = "WARNING! 'system' not in MSG Data or 'id' not in system data!"
+        error_msg.append(msg)
+
+    if 'member' in pk_response and 'id' in pk_response['member']:  # PK Member Id
+        member_pk_id = pk_response['member']['id']
+    else:
+        member_pk_id = None
+        msg = "WARNING! 'member' not in MSG Data or 'id' not in member data!"
+        error_msg.append(msg)
+
+    # TODO: Remove verbose Logging once feature deemed to be stable .
+    logging.info(f"Updating msg: {message_id} with Sender ID: {sender_discord_id}, System ID: {system_pk_id}, Member ID: {member_pk_id}")
+    await db.update_cached_message_pk_details(client.db_pool, guild_id, message_id, system_pk_id, member_pk_id, sender_discord_id)
+
+    if len(error_msg) > 0:
+        await utils.send_error_msg_to_log(client, error_msg, header=error_header)
 
 
 @client.event
@@ -1112,6 +1199,7 @@ if __name__ == '__main__':
     db_pool: asyncpg.pool.Pool = asyncio.get_event_loop().run_until_complete(db.create_db_pool(config['db_uri']))
     asyncio.get_event_loop().run_until_complete(db.create_tables(db_pool))
 
+    client.config = config
     client.db_pool = db_pool
     client.command_prefix = config['bot_prefix']
     client.run(config['token'])
