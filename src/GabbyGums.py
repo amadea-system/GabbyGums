@@ -576,10 +576,10 @@ async def verify_permissions(ctx: commands.Context, guild_id: Optional[str] = No
     event_configs = await db.get_server_log_configs(bot.db_pool, guild.id)
     for event_type in event_configs.available_event_types():
         event = event_configs[event_type]
-        if not event.enabled:
-            event_config_msg_fragments.append(f"__{event_type}:__\nLogging Disabled")
-        elif event.log_channel_id is None:
+        if event is None or event.log_channel_id is None:
             event_config_msg_fragments.append(f"__{event_type}:__\nLogging to {default_log_channel}")
+        elif not event.enabled:
+            event_config_msg_fragments.append(f"__{event_type}:__\nLogging Disabled")
         else:
             event_config_msg_fragments.append(f"__{event_type}:__\nLogging to <#{event.log_channel_id}>")
 
