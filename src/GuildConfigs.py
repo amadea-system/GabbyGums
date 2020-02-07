@@ -46,6 +46,8 @@ class GuildLoggingConfig:
     member_join: EventConfig = None
     member_leave: EventConfig = None
     guild_member_nickname: EventConfig = None
+    # username_update: EventConfig = None
+    user_avatar_update: EventConfig = None
     # bulk_message_delete: EventConfig = None
     # username_change: EventConfig = None
     # channel_create: EventConfig = None

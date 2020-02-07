@@ -23,6 +23,7 @@ import db
 import embeds
 import utils
 import GuildConfigs
+from imgUtils.avatarChangedImgProcessor import get_avatar_changed_image
 from bot import GGBot
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s")
@@ -1122,12 +1123,47 @@ async def on_member_remove(member: discord.Member):
     await log_channel.send(embed=embed)
 
 
+@commands.is_owner()
+@client.command(name="pfp")
+async def pfp_test_cmd(ctx: commands.Context, after: discord.Member):
+
+    event_type_avatar = "user_avatar_update"
+    before: discord.Member = ctx.author
+    # noinspection PyTypeChecker
+    await avatar_changed_update(before, after)
+
+
 @client.event
-async def on_user_update(before, after):
+async def on_user_update(before: discord.User, after: discord.User):
     # username, Discriminator
-    # print("User_update")
-    # print(after)
-    pass
+    event_type_name = "username_update"
+
+    if before.avatar != after.avatar:
+        # Get a list of guilds the user is currently in.
+        await avatar_changed_update(before, after)
+
+
+async def avatar_changed_update(before: discord.User, after: discord.User):
+    """Sends the appropriate logs on a User Avatar Changed Event"""
+    event_type_avatar = "user_avatar_update"
+
+    guilds = [guild for guild in client.guilds if before in guild.members]
+    if len(guilds) > 0:
+        # get the pfp changed embed image and convert it to a discord.File
+        avatar_changed_file_name = "avatarChanged.png"
+        with await get_avatar_changed_image(client, before, after) as avatar_changed_bytes:
+            # create the embed
+            embed = embeds.user_avatar_update(before, after, avatar_changed_file_name)
+
+            # loop through all the guilds the member is in and send the embed and image
+            for guild in guilds:
+                log_channel = await get_event_or_guild_logging_channel(client.db_pool, guild.id, event_type_avatar)
+                if log_channel is not None:
+                    # The File Object needs to be recreated for every post, and the buffer needs to be rewound to the beginning
+                    avatar_changed_bytes.seek(0)
+                    avatar_changed_img = discord.File(filename=avatar_changed_file_name, fp=avatar_changed_bytes)
+                    # Send the embed and file
+                    await log_channel.send(file=avatar_changed_img, embed=embed)
 
 
 @client.event

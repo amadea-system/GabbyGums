@@ -3,6 +3,7 @@
 """
 
 import discord
+from discord.ext import commands
 from datetime import datetime
 from typing import Optional, Union
 from db import StoredInvite, CachedMessage
@@ -234,6 +235,20 @@ def member_nick_update(before: discord.Member, after: discord.Member) -> discord
 
     embed.add_field(name="Old Nickname", value=before.nick, inline=True)
     embed.add_field(name="New Nickname", value=after.nick, inline=True)
+    embed.set_footer(text="User ID: {}".format(after.id))
+
+    return embed
+
+
+def user_avatar_update(before: discord.User, after: discord.User, embed_image_filename: str) -> discord.Embed:
+
+    embed = discord.Embed(#title="Avatar Changed",
+                          description="<@{}> - {}#{} changed their avatar.".format(after.id, after.name, after.discriminator),
+                          color=0x00aaaa, timestamp=datetime.utcnow())
+
+    embed.set_author(name="Avatar Changed")
+    embed.set_image(url=f"attachment://{embed_image_filename}")
+
     embed.set_footer(text="User ID: {}".format(after.id))
 
     return embed
