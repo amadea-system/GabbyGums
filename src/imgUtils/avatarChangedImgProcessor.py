@@ -7,7 +7,7 @@ from functools import partial
 from typing import Optional, Union, List, Dict, Tuple
 
 import aiohttp
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
 import discord
 from discord.ext import commands
 
@@ -34,28 +34,50 @@ async def get_avatar_changed_image(bot: commands.bot, before: discord.User, afte
     return final_img_buffer
 
 
-async def get_avatar(user: Union[discord.User, discord.Member]) -> bytes:
+async def get_avatar(user: Union[discord.User, discord.Member]) -> Optional[bytes]:
     # generally an avatar will be 1024x1024, but we shouldn't rely on this
     avatar_url = str(user.avatar_url_as(format="png"))
 
     async with aiohttp.ClientSession() as session:
         async with session.get(avatar_url) as response:
-            # this gives us our response object, and now we can read the bytes from it.
-            avatar_bytes = await response.read()
-
+            if response.status == 200:
+                # this gives us our response object, and now we can read the bytes from it.
+                avatar_bytes = await response.read()
+            elif response.status == 404:
+                avatar_bytes = None
+                log.warning("Got 404 trying to download pfp!")
+            else:
+                avatar_bytes = None
+                log.error(f"Got {response.status} trying to download pfp!\n{response}")
     return avatar_bytes
 
 
-def avatar_changed_processor_trans_bg(before_avatar_bytes: bytes, after_avatar_bytes: bytes) -> BytesIO:
+def open_and_prepare_avatar(image_bytes: Optional[bytes]) -> Optional[Image.Image]:
+    """Opens the image as bytes if they exist, otherwise opens the 404 error image. then circular crops and resizes it"""
+    if image_bytes is not None:
+        try:
+            with Image.open(BytesIO(image_bytes)) as im:
+                prepared_image = crop_circular_border_w_transparent_bg(im)
+                prepared_image = resize_image(prepared_image)
+        except UnidentifiedImageError as e:
+            log.error("Error loading Avatar", exc_info=e)
+            return None
+    else:
+        with Image.open("resources/404 Avatar Not Found.png") as im:
+            prepared_image = crop_circular_border_w_transparent_bg(im)
+            prepared_image = resize_image(prepared_image)
+
+    return prepared_image
+
+
+def avatar_changed_processor_trans_bg(before_avatar_bytes: Optional[bytes], after_avatar_bytes: Optional[bytes], avatar_info) -> Optional[BytesIO]:
     # we must use BytesIO to load the image here as PIL expects a stream instead of
     # just raw bytes.
-    with Image.open(BytesIO(before_avatar_bytes)) as b_im:
-        b_avatar = crop_circular_border_w_transparent_bg(b_im)
-        b_avatar = resize_image(b_avatar)
-
-    with Image.open(BytesIO(after_avatar_bytes)) as a_im:
-        a_avatar = crop_circular_border_w_transparent_bg(a_im)
-        a_avatar = resize_image(a_avatar)
+    b_avatar = open_and_prepare_avatar(before_avatar_bytes)
+    a_avatar = open_and_prepare_avatar(after_avatar_bytes)
+    if b_avatar is None or a_avatar is None:
+        log.error(f"Avatar info: {avatar_info}")
+        return None
 
     text_box_height = 60
     image_spacing = 25

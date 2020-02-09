@@ -1122,7 +1122,7 @@ async def on_member_remove(member: discord.Member):
         return
     await log_channel.send(embed=embed)
 
-
+# For debugging purposes only.
 @commands.is_owner()
 @client.command(name="pfp")
 async def pfp_test_cmd(ctx: commands.Context, after: discord.Member):
@@ -1131,6 +1131,21 @@ async def pfp_test_cmd(ctx: commands.Context, after: discord.Member):
     before: discord.Member = ctx.author
     # noinspection PyTypeChecker
     await avatar_changed_update(before, after)
+
+
+# For debugging purposes only.
+@commands.is_owner()
+@client.command(name="pfp-all")
+async def pfp_all_test_cmd(ctx: commands.Context, maximum_number: int = 10):
+    from random import SystemRandom as sRandom
+    random = sRandom()
+    members: List[discord.Member] = list(client.get_all_members())
+    await ctx.send(f"Generating {maximum_number} avatar changed embeds out of {len(members)} total members.")
+    some_members = random.choices(members, k=maximum_number)
+    for member in some_members:
+        # noinspection PyTypeChecker
+        await avatar_changed_update(member, member)
+    await ctx.send(f"Done sending test embeds.")
 
 
 @client.event
@@ -1151,7 +1166,12 @@ async def avatar_changed_update(before: discord.User, after: discord.User):
     if len(guilds) > 0:
         # get the pfp changed embed image and convert it to a discord.File
         avatar_changed_file_name = "avatarChanged.png"
-        with await get_avatar_changed_image(client, before, after) as avatar_changed_bytes:
+
+        avatar_info = {"before name": before.name, "before id": before.id, "before pfp": before.avatar_url_as(format="png"),
+                       "after name": after.name, "after id": after.id, "after pfp": after.avatar_url_as(format="png")
+                       }  # For Debugging
+
+        with await get_avatar_changed_image(client, before, after, avatar_info) as avatar_changed_bytes:
             # create the embed
             embed = embeds.user_avatar_update(before, after, avatar_changed_file_name)
 
@@ -1160,6 +1180,7 @@ async def avatar_changed_update(before: discord.User, after: discord.User):
                 log_channel = await get_event_or_guild_logging_channel(client.db_pool, guild.id, event_type_avatar)
                 if log_channel is not None:
                     # The File Object needs to be recreated for every post, and the buffer needs to be rewound to the beginning
+                    # TODO: Handle case where avatar_changed_bytes could be None.
                     avatar_changed_bytes.seek(0)
                     avatar_changed_img = discord.File(filename=avatar_changed_file_name, fp=avatar_changed_bytes)
                     # Send the embed and file
