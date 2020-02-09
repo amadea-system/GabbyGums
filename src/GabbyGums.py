@@ -1122,6 +1122,7 @@ async def on_member_remove(member: discord.Member):
         return
     await log_channel.send(embed=embed)
 
+
 # For debugging purposes only.
 @commands.is_owner()
 @client.command(name="pfp")
