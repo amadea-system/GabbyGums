@@ -320,6 +320,8 @@ def member_nick_update(before: discord.Member, after: discord.Member) -> discord
         description="<@{}> - {}#{} changed their nickname.".format(after.id, after.name, after.discriminator),
         color=0x00ffff, timestamp=datetime.utcnow())
 
+    embed.set_author(name="Nickname Changed")
+
     embed.set_thumbnail(url="https://i.imgur.com/HtQ53lx.png")
 
     embed.add_field(name="Old Nickname", value=before.nick, inline=True)
@@ -341,9 +343,10 @@ def user_name_update(before: discord.User, after: discord.User) -> discord.Embed
         # Both changed
         changed_txt = "Username & Discriminator"
 
-    embed = discord.Embed(title=f"{changed_txt} Changed",
-                          description=f"<@{after.id}> - {after.name}#{after.discriminator} changed their {changed_txt}.",
+    embed = discord.Embed(description=f"<@{after.id}> - {after.name}#{after.discriminator} changed their {changed_txt}.",
                           color=discord.Color.teal(), timestamp=datetime.utcnow())
+
+    embed.set_author(name=f"{changed_txt} Changed")
 
     if before.name != after.name:
         embed.add_field(name="Old Username:", value=before.name, inline=True)
