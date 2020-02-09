@@ -9,7 +9,8 @@ import logging
 import traceback
 import asyncio
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
+from datetime import timedelta
 
 import psutil
 import asyncpg
@@ -17,7 +18,6 @@ import aiohttp
 import discord
 from discord.ext import commands
 from discord.utils import oauth_url
-
 
 import db
 import embeds
@@ -1115,11 +1115,89 @@ async def on_member_join(member: discord.Member):
 async def on_member_remove(member: discord.Member):
     event_type = "member_leave"
 
-    embed = embeds.member_leave(member)
     log_channel = await get_event_or_guild_logging_channel(client.db_pool, member.guild.id, event_type)
     if log_channel is None:
         # Silently fail if no log channel is configured.
         return
+    # We have a log channel. Start pulling audit logs and doing stuff
+
+    guild: discord.Guild = member.guild
+    try:
+        audit_log_entries = await utils.get_audit_logs(guild, discord.AuditLogAction.kick, member, timedelta(seconds=30))
+        if len(audit_log_entries) > 0:
+            # Assume the latest entry is the correct entry.
+            # Todo: Maybe Look at the time data and reject if it's too old? Kinda redundent though since we already filter them all out...
+            audit_log = audit_log_entries[0]
+            # reason = f" because: {audit_log.reason}" if audit_log.reason else ". No Reason was given"
+            logging.info(f"Got Audit log entries")
+            # return
+        else:
+            logging.info(f"No audit log entries present")
+            audit_log = None
+
+    except utils.MissingAuditLogPermissions:
+        # log.info(f"{member.name} left.")
+        # log.info(f"Gabby Gums needs the View Audit Log permission to display who kicked the member.")
+        logging.info("Need more perms")
+        audit_log = None
+
+    if audit_log is not None:
+        embed = embeds.member_kick(member, audit_log)
+    else:
+        embed = embeds.member_leave(member)
+
+    await log_channel.send(embed=embed)
+
+
+@client.event
+async def on_member_ban(guild: discord.Guild, user: Union[discord.User, discord.Member]):
+    """ User can be either a User (if they were hackbanned) Or a Member () If they were in the guild when banned"""
+    await log_member_ban_or_unban(guild, user, "ban")
+
+
+@client.event
+async def on_member_unban(guild: discord.Guild, user: discord.User):
+    await log_member_ban_or_unban(guild, user, "unban")
+
+
+async def log_member_ban_or_unban(guild: discord.Guild, user: Union[discord.User, discord.Member], ban_or_unban: str):
+    """ If ban, use "ban". if unban, use "unban" """
+    logging.info(f"User {ban_or_unban} Guild: {guild}, User: {user}")
+    await asyncio.sleep(0.5)
+    if ban_or_unban.lower() == "ban":
+        audit_action = discord.AuditLogAction.ban
+        embed_fn = embeds.member_ban
+        event_type = "member_ban"
+    elif ban_or_unban.lower() == "unban":
+        audit_action = discord.AuditLogAction.unban
+        embed_fn = embeds.member_unban
+        event_type = "member_unban"
+    else:
+        raise ValueError("ban_or_unban must be 'ban' or 'unban' ")
+
+    log_channel = await get_event_or_guild_logging_channel(client.db_pool, guild.id, event_type)
+    if log_channel is None:
+        # Silently fail if no log channel is configured.
+        return
+    # We have a log channel. Start pulling audit logs and doing stuff
+
+    try:
+        audit_log_entries = await utils.get_audit_logs(guild, audit_action, user, timedelta(seconds=30))
+        if len(audit_log_entries) > 0:
+            # Assume the latest entry is the correct entry.
+            # Todo: Maybe Look at the time data and reject if it's too old? Kinda redundent though since we already filter them all out...
+            audit_log = audit_log_entries[0]
+            logging.info("Got logs")
+        else:
+            audit_log = None
+            logging.info("Got NO logs")
+
+    except utils.MissingAuditLogPermissions:
+        audit_log = None
+        logging.info("need perms")
+        # log.info(f"Gabby Gums needs the View Audit Log permission to display who {action_verbage} members.")
+
+    embed = embed_fn(user, audit_log)
     await log_channel.send(embed=embed)
 
 
@@ -1152,11 +1230,26 @@ async def pfp_all_test_cmd(ctx: commands.Context, maximum_number: int = 10):
 @client.event
 async def on_user_update(before: discord.User, after: discord.User):
     # username, Discriminator
-    event_type_name = "username_update"
 
     if before.avatar != after.avatar:
         # Get a list of guilds the user is currently in.
         await avatar_changed_update(before, after)
+
+    if before.name != after.name or before.discriminator != after.discriminator:
+        await username_changed_update(before, after)
+
+
+async def username_changed_update(before: discord.User, after: discord.User):
+    event_type_name = "username_change"
+    # Username and/or discriminator changed
+    embed = embeds.user_name_update(before, after)
+
+    guilds = [guild for guild in client.guilds if before in guild.members]
+    if len(guilds) > 0:
+        for guild in guilds:
+            log_channel = await get_event_or_guild_logging_channel(client.db_pool, guild.id, event_type_name)
+            if log_channel is not None:
+                await log_channel.send(embed=embed)
 
 
 async def avatar_changed_update(before: discord.User, after: discord.User):

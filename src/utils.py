@@ -1,6 +1,7 @@
 import textwrap
 from typing import Union, Optional, Dict, List
 import logging
+from datetime import datetime, timedelta
 
 import discord
 from discord.ext import commands
@@ -8,6 +9,7 @@ from discord.ext import commands
 from bot import GGBot
 
 log = logging.getLogger(__name__)
+
 
 async def send_long_msg(channel: discord.TextChannel, message: str, code_block: bool = False, code_block_lang: str = "python"):
 
@@ -69,3 +71,32 @@ async def send_error_msg_to_log(bot: GGBot, error_messages: Optional[Union[str, 
     except discord.DiscordException as e:
         log.exception(f"Error sending log to Global Error Discord Channel!: {e}")
         return False
+
+
+class MissingAuditLogPermissions(Exception):
+    pass
+
+
+async def get_audit_logs(guild: discord.Guild, audit_action: discord.AuditLogAction, target_user: Union[discord.User, discord.Member, discord.Object],
+                         in_last: Optional[timedelta] = None) -> List[discord.AuditLogEntry]:
+
+    permissions: discord.Permissions = guild.me.guild_permissions
+    if permissions.view_audit_log:
+        # if in_last is None:
+        #     in_last = timedelta.max
+        after_time = datetime.utcnow() - in_last if in_last else datetime.min
+
+        def predicate(entry: discord.AuditLogEntry):
+            if target_user is not None and entry.target is not None:
+                return entry.created_at > after_time and entry.target.id == target_user.id
+            else:
+                return entry.created_at > after_time
+
+        audit_log_entries = await guild.audit_logs(action=audit_action, oldest_first=False).filter(predicate).flatten()
+        # entries = []
+        # async for audit_log in audit_log_entries:
+        #     entries.append(audit_log)
+        #     log.info(f"Entry: {audit_log} @ {audit_log.created_at}")
+        return audit_log_entries
+    else:
+        raise MissingAuditLogPermissions

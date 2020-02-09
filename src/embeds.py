@@ -228,10 +228,99 @@ def member_leave(member: discord.Member) -> discord.Embed:
     return embed
 
 
+def member_kick(member: discord.Member, audit_log: Optional[discord.AuditLogEntry]) -> discord.Embed:
+    embed = discord.Embed(description="<@{}> - {}#{}".format(member.id, member.name, member.discriminator),
+                          color=discord.Color.dark_orange(), timestamp=datetime.utcnow())
+
+    embed.set_author(name="Member Kicked",
+                     icon_url="https://i.imgur.com/o96t3cV.png")
+
+    # Need to use format other than WebP for image to display on iOS. (I think this is a recent discord bug.)
+    ios_compatible_avatar_url = member.avatar_url_as(static_format="png")
+    embed.set_thumbnail(url=ios_compatible_avatar_url)
+    embed.add_field(name="Info:",
+                    value="{} was kicked from the server.".format(member.display_name),
+                    inline=False)
+
+    if audit_log is not None:
+        embed.add_field(name="Kicked By:",
+                        value="<@{}> - {}#{}".format(audit_log.user.id, audit_log.user.name, audit_log.user.discriminator), inline=False)
+
+        reason = f"{audit_log.reason}" if audit_log.reason else "No Reason was given."
+        embed.add_field(name="Reason:",
+                        value=reason,
+                        inline=False)
+
+    embed.set_footer(text="User ID: {}".format(member.id))
+
+    return embed
+
+def member_ban(member: discord.Member, audit_log: Optional[discord.AuditLogEntry]) -> discord.Embed:
+    embed = discord.Embed(description="<@{}> - {}#{}".format(member.id, member.name, member.discriminator),
+                          color=discord.Color.dark_red(), timestamp=datetime.utcnow())
+
+    embed.set_author(name="Member Banned", icon_url="http://i.imgur.com/Imx0Znm.png")
+
+    # Need to use format other than WebP for image to display on iOS. (I think this is a recent discord bug.)
+    ios_compatible_avatar_url = str(member.avatar_url_as(static_format="png"))
+    embed.set_thumbnail(url=ios_compatible_avatar_url)
+    embed.add_field(name="Info:",
+                    value="{} was banned from the server.".format(member.display_name),
+                    inline=False)
+
+    if audit_log is not None:
+        embed.add_field(name="Banned By:",
+                        value="<@{}> - {}#{}".format(audit_log.user.id, audit_log.user.name, audit_log.user.discriminator), inline=False)
+
+        reason = f"{audit_log.reason}" if audit_log.reason else "No Reason was given."
+        embed.add_field(name="Reason:",
+                        value=reason,
+                        inline=False)
+    # else:
+    #     embed.add_field(name="Need `View Audit Log` Permissions to show more information",
+    #                     value="\N{zero width space}")
+
+    embed.set_footer(text="User ID: {}".format(member.id))
+
+    return embed
+
+
+def member_unban(member: discord.User, audit_log: Optional[discord.AuditLogEntry]) -> discord.Embed:
+    embed = discord.Embed(description="<@{}> - {}#{}".format(member.id, member.name, member.discriminator),
+                          color=discord.Color.dark_green(), timestamp=datetime.utcnow())
+
+    embed.set_author(name="Member Unbanned", icon_url="https://i.imgur.com/OCcebCO.png")
+
+    # Need to use format other than WebP for image to display on iOS. (I think this is a recent discord bug.)
+    ios_compatible_avatar_url = str(member.avatar_url_as(static_format="png"))
+    embed.set_thumbnail(url=ios_compatible_avatar_url)
+    embed.add_field(name="Info:",
+                    value="{} was unbanned from the server.".format(member.display_name),
+                    inline=False)
+
+    if audit_log is not None:
+        embed.add_field(name="Unbanned By:",
+                        value="<@{}> - {}#{}".format(audit_log.user.id, audit_log.user.name, audit_log.user.discriminator), inline=False)
+
+        reason = f"{audit_log.reason}" if audit_log.reason else "No Reason was given."
+        embed.add_field(name="Reason:",
+                        value=reason,
+                        inline=False)
+    # else:
+    #     embed.add_field(name="Need `View Audit Log` Permissions to show more information",
+    #                     value="\N{zero width space}")
+
+    embed.set_footer(text="User ID: {}".format(member.id))
+
+    return embed
+
+
 def member_nick_update(before: discord.Member, after: discord.Member) -> discord.Embed:
     embed = discord.Embed(
         description="<@{}> - {}#{} changed their nickname.".format(after.id, after.name, after.discriminator),
         color=0x00ffff, timestamp=datetime.utcnow())
+
+    embed.set_thumbnail(url="https://i.imgur.com/HtQ53lx.png")
 
     embed.add_field(name="Old Nickname", value=before.nick, inline=True)
     embed.add_field(name="New Nickname", value=after.nick, inline=True)
@@ -240,10 +329,38 @@ def member_nick_update(before: discord.Member, after: discord.Member) -> discord
     return embed
 
 
+def user_name_update(before: discord.User, after: discord.User) -> discord.Embed:
+
+    if before.name != after.name and before.discriminator == after.discriminator:
+        # Name changed, discriminator did not
+        changed_txt = "Username"
+    elif before.name == after.name and before.discriminator != after.discriminator:
+        # Discrim changed, Name did not
+        changed_txt = "Discriminator"
+    else:
+        # Both changed
+        changed_txt = "Username & Discriminator"
+
+    embed = discord.Embed(title=f"{changed_txt} Changed",
+                          description=f"<@{after.id}> - {after.name}#{after.discriminator} changed their {changed_txt}.",
+                          color=discord.Color.teal(), timestamp=datetime.utcnow())
+
+    if before.name != after.name:
+        embed.add_field(name="Old Username:", value=before.name, inline=True)
+        embed.add_field(name="New Username:", value=after.name, inline=True)
+
+    if before.discriminator != after.discriminator:
+        embed.add_field(name="Old Discriminator:", value=before.discriminator, inline=True)
+        embed.add_field(name="New Discriminator:", value=after.discriminator, inline=True)
+
+    embed.set_footer(text="User ID: {}".format(after.id))
+
+    return embed
+
+
 def user_avatar_update(before: discord.User, after: discord.User, embed_image_filename: str) -> discord.Embed:
 
-    embed = discord.Embed(#title="Avatar Changed",
-                          description="<@{}> - {}#{} changed their avatar.".format(after.id, after.name, after.discriminator),
+    embed = discord.Embed(description="<@{}> - {}#{} changed their avatar.".format(after.id, after.name, after.discriminator),
                           color=0x00aaaa, timestamp=datetime.utcnow())
 
     embed.set_author(name="Avatar Changed")

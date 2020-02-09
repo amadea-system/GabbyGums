@@ -45,8 +45,10 @@ class GuildLoggingConfig:
     message_delete: EventConfig = None
     member_join: EventConfig = None
     member_leave: EventConfig = None
+    member_ban: EventConfig = None
+    member_unban: EventConfig = None
     guild_member_nickname: EventConfig = None
-    # username_update: EventConfig = None
+    username_change: EventConfig = None
     user_avatar_update: EventConfig = None
     # bulk_message_delete: EventConfig = None
     # username_change: EventConfig = None
