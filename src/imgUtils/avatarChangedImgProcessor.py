@@ -18,14 +18,14 @@ log = logging.getLogger(__name__)
 discord_dark_mode_bg = (54, 57, 63)
 
 
-async def get_avatar_changed_image(bot: commands.bot, before: discord.User, after: discord.User) -> BytesIO:
+async def get_avatar_changed_image(bot: commands.bot, before: discord.User, after: discord.User, avatar_info) -> BytesIO:
 
     # Get the avatars as a sequence of bytes
     avatar_bytes_b = await get_avatar(before)
     avatar_bytes_a = await get_avatar(after)
 
     # create partial function so we don't have to stack the args in run_in_executor
-    fn = partial(avatar_changed_processor_trans_bg, avatar_bytes_b, avatar_bytes_a)
+    fn = partial(avatar_changed_processor_trans_bg, avatar_bytes_b, avatar_bytes_a, avatar_info)
 
     # this runs our processing in an executor, stopping it from blocking the thread loop.
     # as we already seeked back the buffer in the other thread, we're good to go
