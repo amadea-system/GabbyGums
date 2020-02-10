@@ -2,6 +2,7 @@
 Gabby Gums
 Functions and enums for configuring guild specific settings
 """
+from __future__ import annotations
 
 from dataclasses import dataclass, fields, asdict
 from typing import Optional, List
@@ -35,6 +36,20 @@ class EventConfig:
     enabled: Optional[bool] = True
     log_channel_id: Optional[int] = None
 
+    @classmethod
+    def from_dict(cls, _dict) -> EventConfig:
+        configs = cls()
+
+        if _dict is None:
+            return configs
+
+        if 'enabled' in _dict:
+            configs.enabled = _dict['enabled']
+        if 'log_channel_id' in _dict:
+            configs.log_channel_id = _dict['log_channel_id']
+
+        return configs
+
 
 # TODO: Should we just use a dict instead of going to all the hassle of converting back and forth?
 @dataclass
@@ -47,9 +62,9 @@ class GuildLoggingConfig:
     member_leave: EventConfig = None
     member_ban: EventConfig = None
     member_unban: EventConfig = None
+    member_avatar_change: EventConfig = None
     guild_member_nickname: EventConfig = None
     username_change: EventConfig = None
-    user_avatar_update: EventConfig = None
     # bulk_message_delete: EventConfig = None
     # username_change: EventConfig = None
     # channel_create: EventConfig = None
@@ -91,6 +106,17 @@ class GuildLoggingConfig:
 
     def available_event_types(self) -> List[str]:
         return list(self.__dict__.keys())
+
+    @classmethod
+    def from_dict(cls, _dict) -> GuildLoggingConfig:
+        configs = cls()
+        if _dict is None:
+            return configs
+
+        for key in configs.__dict__.keys():
+            if key in _dict:
+                configs[key] = EventConfig.from_dict(_dict[key])
+        return configs
 
 
 def load_nested_dict(dc, _dict):

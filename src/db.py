@@ -112,8 +112,8 @@ async def set_server_log_configs(pool, sid: int, log_configs: GuildConfigs.Guild
 async def get_server_log_configs(pool, sid: int) -> GuildConfigs.GuildLoggingConfig:
     async with pool.acquire() as conn:
         value = await conn.fetchval('SELECT log_configs FROM servers WHERE server_id = $1', sid)
-        return GuildConfigs.load_nested_dict(GuildConfigs.GuildLoggingConfig, value) if value else GuildConfigs.GuildLoggingConfig()
-
+        # return GuildConfigs.load_nested_dict(GuildConfigs.GuildLoggingConfig, value) if value else GuildConfigs.GuildLoggingConfig()
+        return GuildConfigs.GuildLoggingConfig.from_dict(value)
 
 # ----- Ignored Users DB Functions ----- #
 

@@ -308,7 +308,6 @@ async def _channel(ctx: commands.Context, event_type: str, channel: Optional[dis
     else:
         guild_event_configs = await db.get_server_log_configs(bot.db_pool, ctx.guild.id)
         channel_id = channel.id if channel is not None else None
-
         if guild_event_configs[event_type] is not None:
             guild_event_configs[event_type].log_channel_id = channel_id
         else:
@@ -331,7 +330,6 @@ async def enabled(ctx: commands.Context, event_type: str, is_enabled: bool):
         return
     else:
         guild_event_configs = await db.get_server_log_configs(bot.db_pool, ctx.guild.id)
-
         if guild_event_configs[event_type] is not None:
             guild_event_configs[event_type].enabled = is_enabled
         else:
@@ -1254,7 +1252,7 @@ async def username_changed_update(before: discord.User, after: discord.User):
 
 async def avatar_changed_update(before: discord.User, after: discord.User):
     """Sends the appropriate logs on a User Avatar Changed Event"""
-    event_type_avatar = "user_avatar_update"
+    event_type_avatar = "member_avatar_change"
 
     guilds = [guild for guild in client.guilds if before in guild.members]
     if len(guilds) > 0:
