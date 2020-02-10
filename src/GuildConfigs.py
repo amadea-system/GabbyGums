@@ -62,7 +62,7 @@ class GuildLoggingConfig:
     member_leave: EventConfig = None
     member_ban: EventConfig = None
     member_unban: EventConfig = None
-    member_avatar_change: EventConfig = None
+    member_avatar_change: EventConfig = EventConfig(enabled=False)
     guild_member_nickname: EventConfig = None
     username_change: EventConfig = None
     # bulk_message_delete: EventConfig = None
