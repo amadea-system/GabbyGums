@@ -42,12 +42,5 @@ class MemberUpdate(commands.Cog):
             await log_channel.send(embed=embed)
 
 
-    @commands.command()
-    async def hello(self, ctx, *, member: discord.Member = None):
-        """Says hello"""
-        member = member or ctx.author
-        await ctx.send('Hello {0.name}~'.format(member))
-
-
 def setup(bot):
     bot.add_cog(MemberUpdate(bot))
