@@ -1,11 +1,9 @@
 """
 Cog containing various developer only commands used for debugging purposes only.
 Commands include:
-    cogtest
-    bot_invite
-    ping
-    stats
-    verify_perm
+    devtest
+    dump
+    past_messages
 
 Part of the Gabby Gums Discord Logger.
 """
