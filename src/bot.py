@@ -29,6 +29,8 @@ class GGBot(commands.Bot):
         self.db_pool: Optional[asyncpg.pool.Pool] = None
         self.config: Optional[Dict] = None
 
+        self.update_playing.start()
+
 
     def load_cogs(self):
         for extension in extensions:
@@ -38,6 +40,25 @@ class GGBot(commands.Bot):
             except Exception as e:
                 log.info(f'Failed to load extension {extension}.', file=sys.stderr)
                 traceback.print_exc()
+
+    # ----- Now Playing Update Task --- #
+    # noinspection PyCallingNonCallable
+    @tasks.loop(minutes=30)
+    async def update_playing(self):
+        log.info("Updating now Playing...")
+        await self.set_playing_status()
+
+
+    @update_playing.before_loop
+    async def before_update_playing(self):
+        await self.wait_until_ready()
+
+
+    async def set_playing_status(self):
+        activity = discord.Game("{}help | in {} Servers".format(self.command_prefix, len(self.guilds)))
+        await self.change_presence(status=discord.Status.online, activity=activity)
+
+    # ----------------------------------- #
 
     # ----- Get Logging Channel Methods ----- #
 

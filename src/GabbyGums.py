@@ -94,9 +94,9 @@ async def on_ready():
     logging.info('Username: {0.name}, ID: {0.id}'.format(client.user))
     logging.info("Connected to {} servers.".format(len(client.guilds)))
     logging.info('------')
-
-    activity = discord.Game("{}help".format(client.command_prefix))
-    await client.change_presence(status=discord.Status.online, activity=activity)
+    #
+    # activity = discord.Game("{}help".format(client.command_prefix))
+    # await client.change_presence(status=discord.Status.online, activity=activity)
 
     # ensure the invite cache is upto date on connection.
     logging.info("Refreshing Invite Cache.")
