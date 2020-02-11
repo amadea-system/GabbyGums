@@ -20,6 +20,7 @@ extensions = (
     # 'events.memberBan',
     'cmds.utilities',
     'cmds.dev',
+    'cmds.configuration'
 )
 
 
@@ -90,6 +91,29 @@ class GGBot(commands.Bot):
             except discord.NotFound:
                 return None
         return channel
+    # endregion
+
+    # region User/Chan/Cat Ignored Checkers
+    async def is_channel_ignored(self, guild_id: int, channel_id: int) -> bool:
+        _ignored_channels = await db.get_ignored_channels(self.db_pool, int(guild_id))
+        if int(channel_id) in _ignored_channels:
+            return True
+        return False
+
+
+    async def is_user_ignored(self, guild_id: int, user_id: int) -> bool:
+        _ignored_users = await db.get_ignored_users(self.db_pool, int(guild_id))
+        if int(user_id) in _ignored_users:
+            return True  # This is a message from a user the guild does not wish to log. Do not log the event.
+        return False
+
+
+    async def is_category_ignored(self, guild_id: int, category: Optional[discord.CategoryChannel]) -> bool:
+        if category is not None:  # If channel is not in a category, don't bother querying DB
+            _ignored_categories = await db.get_ignored_categories(self.db_pool, int(guild_id))
+            if category.id in _ignored_categories:
+                return True
+        return False
     # endregion
 
 
