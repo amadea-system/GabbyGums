@@ -1280,22 +1280,6 @@ async def avatar_changed_update(before: discord.User, after: discord.User):
 
 
 @client.event
-async def on_member_update(before: discord.Member, after: discord.Member):
-    event_type_nick = "guild_member_nickname"  # nickname
-    event_type_update = "guild_member_update"  # Everything else. Currently unused.
-
-    if before.nick != after.nick:
-
-        log_channel = await get_event_or_guild_logging_channel(client.db_pool, after.guild.id, event_type_nick)
-        if log_channel is None:
-            # Silently fail if no log channel is configured.
-            return
-
-        embed = embeds.member_nick_update(before, after)
-        await log_channel.send(embed=embed)
-
-
-@client.event
 async def on_guild_join(guild: discord.Guild):
     # Todo: Move DB creation to a command.
     #  Having it here is fragile as a user could add the bot and on_guild_join may not ever fire if the bot is down at the time.
@@ -1351,6 +1335,8 @@ if __name__ == '__main__':
     client.config = config
     client.db_pool = db_pool
     client.command_prefix = config['bot_prefix']
+
+    client.load_cogs()
     client.run(config['token'])
 
     logging.info("cleaning Up and shutting down")
