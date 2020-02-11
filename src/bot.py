@@ -18,7 +18,8 @@ log = logging.getLogger(__name__)
 extensions = (
     'events.memberUpdate',
     # 'events.memberBan',
-    # 'cogs.Dev',
+    'cmds.utilities',
+    'cmds.dev',
 )
 
 
