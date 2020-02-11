@@ -41,7 +41,7 @@ class GGBot(commands.Bot):
                 log.info(f'Failed to load extension {extension}.', file=sys.stderr)
                 traceback.print_exc()
 
-    # ----- Now Playing Update Task --- #
+    # region Now Playing Update Task Methods
     # noinspection PyCallingNonCallable
     @tasks.loop(minutes=30)
     async def update_playing(self):
@@ -58,10 +58,9 @@ class GGBot(commands.Bot):
         activity = discord.Game("{}help | in {} Servers".format(self.command_prefix, len(self.guilds)))
         await self.change_presence(status=discord.Status.online, activity=activity)
 
-    # ----------------------------------- #
+    # endregion
 
-    # ----- Get Logging Channel Methods ----- #
-
+    # region Get Logging Channel Methods
     async def get_event_or_guild_logging_channel(self, guild_id: int, event_type: Optional[str] = None) -> Optional[discord.TextChannel]:
         if event_type is not None:
             log_configs = await db.get_server_log_configs(self.db_pool, guild_id)
@@ -90,6 +89,6 @@ class GGBot(commands.Bot):
             except discord.NotFound:
                 return None
         return channel
+    # endregion
 
-    # ----------------------------------- #
 
