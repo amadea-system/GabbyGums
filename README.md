@@ -6,12 +6,17 @@ Gabby Gums is discord logging bot that is able to ignore all the extraneous dele
 Logs the following:
 * Message Edits
 * Message Deletes
+  * Logs for deleted webhook messages from PK also include the Discord account that sent the original message, the System ID, and the Member ID    
   * Supports image logging if you self host Gabby Gums
 * Members joining
   * Includes support for invite tracking so you can tell which invite link a person used and who created the invite.
   * Invite links can be assigned names for easier identification of invite links.
 * Members leaving
 * Members changing their nickname  
+* Account name changes
+* Account Avatar changes
+* Bans, Unbans, and Kicks
+ * Including the person who did the Banning/Unbanning/Kicking
 
 All of the different logged events are able to have their own log channels or be disabled entirely.  
 Able to ignore events based on Channel, Category, and/or user.
