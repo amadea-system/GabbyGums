@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 
 extensions = (
     'events.memberUpdate',
-    # 'events.memberBan',
+    'events.channelEvents',
     'cmds.utilities',
     'cmds.dev',
     'cmds.configuration'
