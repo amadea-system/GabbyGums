@@ -8,7 +8,7 @@ Commands include:
 Part of the Gabby Gums Discord Logger.
 """
 
-import asyncio
+# import asyncio
 import logging
 from typing import TYPE_CHECKING, Optional, Dict, List, Union, Tuple, NamedTuple
 
@@ -55,7 +55,7 @@ async def get_event_configuration_embed(ctx: commands.Context, event_configs: Gu
 
 
 def get_edit_event_embed(event_type_name: str, event_configs: GuildLoggingConfig) -> discord.Embed:
-    log.info(event_configs)
+    # log.info(event_configs)
     configs: EventConfig = event_configs[event_type_name]
     if configs is None:
         # Generate a default config
@@ -117,7 +117,6 @@ class Configuration(commands.Cog):
             embed = get_edit_event_embed(event_type_rsp.response, event_configs)
             edit_page = StringReactPage(embed=embed, buttons=edit_buttons, allowable_responses=[])
             edit_rsp = await edit_page.run(ctx)
-            # await ctx.send(f"You chose: {edit_rsp}")
 
             if edit_rsp is None:
                 # await ctx.send(f"Done!")
@@ -126,12 +125,12 @@ class Configuration(commands.Cog):
             edit_rsp_str = edit_rsp.response.lower().strip()
             if edit_rsp_str == 'stop':
                 await ctx.send(f"Done!")
-                log.info("exiting config_event_menu via stop button.")
+                # log.info("exiting config_event_menu via stop button.")
                 return
             elif edit_rsp_str == 'back':
-                log.info("Recursively calling config_event_menu via back button.")
+                # log.info("Recursively calling config_event_menu via back button.")
                 await self.config_event_menu(ctx)
-                log.info("exiting from back button.")
+                # log.info("exiting from back button.")
                 return
             elif edit_rsp_str == 'toggle':
                 event_configs = await self.toggle_event(ctx, event_type_rsp.response, event_configs)
