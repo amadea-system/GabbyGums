@@ -11,7 +11,7 @@ from bot import GGBot
 log = logging.getLogger(__name__)
 
 
-async def send_long_msg(channel: discord.TextChannel, message: str, code_block: bool = False, code_block_lang: str = "python"):
+async def send_long_msg(channel: [discord.TextChannel, commands.Context], message: str, code_block: bool = False, code_block_lang: str = "python"):
 
     if code_block:
         if len(code_block_lang) > 0:

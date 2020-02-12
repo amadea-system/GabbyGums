@@ -115,7 +115,12 @@ class GuildLoggingConfig:
 
         for key in configs.__dict__.keys():
             if key in _dict:
-                configs[key] = EventConfig.from_dict(_dict[key])
+
+                # Make sure defaults get loaded properly.
+                if key == "member_avatar_change" and _dict[key] is None:
+                    configs[key] = EventConfig(enabled=False)
+                else:
+                    configs[key] = EventConfig.from_dict(_dict[key])
         return configs
 
 
