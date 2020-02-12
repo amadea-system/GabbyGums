@@ -3,12 +3,14 @@
 
 """
 
+import asyncio
+import logging
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Optional, Dict, List, Union, Tuple, NamedTuple, Callable, Any
+
 import discord
 from discord.ext import commands
 
-import asyncio
-import logging
-from typing import TYPE_CHECKING, Optional, Dict, List, Union, Tuple, NamedTuple, Callable, Any
 from fuzzywuzzy import process
 
 
@@ -20,13 +22,53 @@ class DiscordPermissionsError(Exception):
     pass
 
 
-class AddReactionsError(DiscordPermissionsError):
+class CannotAddReactions(DiscordPermissionsError):
     def __init__(self):
-        super().__init__(f"Insufficient permissions to add reactions to user interface!\nPlease have an admin add the **Add Reactions** and **Read Message History** permissions to this bot.")
+        super().__init__(f"Insufficient permissions to add reactions to user interface!\n"
+                         f"Please have an admin add the **Add Reactions** and **Read Message History** permissions to this bot and make sure that the channel you are using commands in is configured to allow those permissions as well.")
+
+
+class CannotEmbedLinks(DiscordPermissionsError):
+    def __init__(self):
+        super().__init__('Bot does not have embed links permission in this channel.')
+
+
+class CannotSendMessages(DiscordPermissionsError):
+    def __init__(self):
+        super().__init__('Bot cannot send messages in this channel.')
+
+
+class CannotAddExtenalReactions(DiscordPermissionsError):
+    def __init__(self):
+        super().__init__(f"Gabby Gums is missing the **Use External Emojis** Permission!\n"
+                         f"Please have an admin add the **Use External Emojis** permissions to this bot and make sure that the channel you are using commands in is configured to allow External Emojis as well.")
+
 
 
 async def do_nothing(*args, **kwargs):
     pass
+
+
+@dataclass
+class PageResponse:
+    """Data Storage class for returning the user response (if any) and the UI Message(es) that the Page sent out."""
+    response: Optional[Any]
+    ui_message: Optional[discord.Message]
+    # user_messages: List[discord.Message] = field(default_factory=[])
+
+    def __str__(self):
+        return str(self.content())
+
+    def content(self):
+        if isinstance(self.response, str):
+            return self.response
+        elif isinstance(self.response, discord.Message):
+            return self.response.content
+        else:
+            return self.response
+
+    def c(self):
+        return self.content()
 
 
 class Page:
@@ -37,7 +79,7 @@ class Page:
     LOG = logging.getLogger("GGBot.Page")
 
     def __init__(self, page_type: str, name: Optional[str] = None, body: Optional[str] = None,
-                 callback: Callable = do_nothing, additional: str = None, embed: Optional[discord.Embed] = None, previous_page: Optional = None, timeout: int = 120.0):
+                 callback: Callable = do_nothing, additional: str = None, embed: Optional[discord.Embed] = None, previous_msg: Optional[Union[discord.Message, PageResponse]] = None, timeout: int = 120.0):
         # self.header_name = header_name
         # self.header_body = header_body
         self.name = name
@@ -48,8 +90,9 @@ class Page:
 
         self.page_type = page_type.lower()
         self.callback = callback
+        self.prev = previous_msg.ui_message if isinstance(previous_msg, PageResponse) else previous_msg
+
         self.response = None
-        self.previous = previous_page
         self.page_message: Optional[discord.Message] = None
         self.user_message: Optional[discord.Message] = None
 
@@ -155,8 +198,8 @@ class Page:
 
     async def remove(self, user: bool = True, page: bool = True):
 
-        if self.previous is not None:
-            await self.previous.remove(user, page)
+        # if self.previous is not None:
+        #     await self.previous.remove(user, page)
 
         try:
             if user and self.user_message is not None:
@@ -281,8 +324,8 @@ class StringPage(Page):
 
 
 class StringReactPage(Page):
-
-    def __init__(self, buttons: List[Tuple[Union[discord.PartialEmoji, str], Any]] = None, allowable_responses: List[str] = None, cancel_btn=True, **kwrgs):
+    cancel_emoji = '🛑'
+    def __init__(self, buttons: List[Tuple[Union[discord.PartialEmoji, str], Any]] = None, allowable_responses: List[str] = None, cancel_btn=True, edit_in_place=False, **kwrgs):
         """
         Callback signature: ctx: commands.Context, page: reactMenu.Page
         """
@@ -290,12 +333,13 @@ class StringReactPage(Page):
         self.match = None
         self.cancel_btn = cancel_btn
         self.allowable_responses = allowable_responses or []
+        self.edit_in_place = edit_in_place
         self.canceled = False
         self.buttons = buttons or []
         self.sent_msg = []
 
         if self.cancel_btn:
-            self.buttons.append(("❌", None))
+            self.buttons.append((self.cancel_emoji, None))
 
         super().__init__(page_type="n/a", **kwrgs)
 
@@ -308,12 +352,11 @@ class StringReactPage(Page):
         author: discord.Member = ctx.author
         message: discord.Message = ctx.message
 
-        if self.embed is None:
-            self.page_message = await channel.send(self.construct_std_page_msg())
-        else:
-            self.page_message = await channel.send(self.construct_std_page_msg(), embed=self.embed)
+        await self.check_permissions()
 
-        self.sent_msg.append(self.page_message)
+        self.page_message = await self.send(self.construct_std_page_msg(), embed=self.embed)
+
+        # self.sent_msg.append(self.page_message)
 
         # self.page_message: discord.Message = await channel.send(embed=self.embed)
         # if self.cancel_btn:
@@ -323,17 +366,13 @@ class StringReactPage(Page):
             try:
                 await self.page_message.add_reaction(reaction)
             except discord.Forbidden:
-                raise AddReactionsError()
+                raise CannotAddReactions()
 
-        # def message_check(_msg: discord.Message):
-        #     # self.LOG.info("Checking Message: Reacted Message: {}, orig message: {}".format(_reaction.message.id,
-        #     #                                                                                 page_message.id))
-        #     return _msg.author == author and _msg.channel == channel
         while True:
 
             done, pending = await asyncio.wait([
-                self.ctx.bot.wait_for('message', timeout=self.timeout, check=self.msg_check),
-                self.ctx.bot.wait_for('raw_reaction_add', timeout=self.timeout, check=self.react_check)
+                self.ctx.bot.wait_for('raw_reaction_add', timeout=self.timeout, check=self.react_check),
+                self.ctx.bot.wait_for('message', timeout=self.timeout, check=self.msg_check)
             ], return_when=asyncio.FIRST_COMPLETED)
 
             try:
@@ -342,7 +381,8 @@ class StringReactPage(Page):
             except asyncio.TimeoutError:
                 # await ctx.send("Command timed out.")
                 await self.remove()
-                await ctx.send("Timed Out!")
+                # await ctx.send("Timed Out!")
+                await ctx.send("Done!")
                 return None
 
             except Exception as e:
@@ -378,13 +418,15 @@ class StringReactPage(Page):
                 if callable(self.match):
                     await self.match(self.ctx, self)
 
-                await self.remove()
-                return self.match
+                if not self._can_remove_reactions or not self.edit_in_place:  # If we can't remove the reactions, we'll just fall back to removing the message.
+                    await self.remove()
+                    # self.prev = None
+                return PageResponse(response=self.match, ui_message=self.prev)
 
 
     def react_check(self, payload):
         """Uses raw_reaction_add"""
-        if not self.cancel_btn:
+        if len(self.buttons) == 0:
             return False
         if payload.user_id != self.ctx.author.id:
             return False
@@ -392,7 +434,7 @@ class StringReactPage(Page):
         if payload.message_id != self.page_message.id:
             return False
 
-        if "❌" == str(payload.emoji):
+        if self.cancel_emoji == str(payload.emoji):
             self.canceled = True
             return True
 
@@ -420,11 +462,47 @@ class StringReactPage(Page):
 
         # return False
 
+    async def check_permissions(self):
+        permissions = self.ctx.channel.permissions_for(self.ctx.guild.me)
+        self._verify_permissions(self.ctx, permissions)
+        #
+        # if self.prev is None and not self._can_remove_reactions:
+        #     # Only send this warning message the first time the menu system is activated.
+        #     await self.ctx.send(f"\N{WARNING SIGN}\ufe0f Gabby Gums is missing the `Manage Messages` permission!\n"
+        #                         f"While you can continue without giving Gabby Gums this permission, you will experience a suboptimal menu system experience.")
+
+    def _verify_permissions(self, ctx, permissions):
+        if not permissions.send_messages:
+            raise CannotSendMessages()
+
+        if self.embed is not None and not permissions.embed_links:
+            raise CannotEmbedLinks()
+
+        self._can_remove_reactions = permissions.manage_messages
+
+        if len(self.buttons) > 0:
+            if not permissions.add_reactions:
+                raise CannotAddReactions()
+            if not permissions.read_message_history:
+                raise CannotAddReactions()
+            if not permissions.external_emojis:
+                raise CannotAddExtenalReactions()
+
+
+    async def send(self, content: Optional[str] = None, embed: Optional[discord.Embed] = None) -> discord.Message:
+
+        if self.prev and self._can_remove_reactions:
+            await self.prev.edit(content=content, embed=embed)
+        else:
+            self.prev = await self.ctx.send(content=content, embed=embed)
+            self.sent_msg.append(self.prev)
+        return self.prev
+
 
     async def remove(self, user: bool = True, page: bool = True):
 
-        if self.previous is not None:
-            await self.previous.remove(user, page)
+        # if self.previous is not None:
+        #     await self.previous.remove(user, page)
 
         try:
             if user and self.user_message is not None:
