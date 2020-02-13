@@ -12,8 +12,6 @@ from typing import TYPE_CHECKING, Optional, Dict, List, Union, Tuple, NamedTuple
 import discord
 from discord.ext import commands
 
-from embeds import member_nick_update
-
 if TYPE_CHECKING:
     from bot import GGBot
 
@@ -114,6 +112,46 @@ class ChannelEvents(commands.Cog):
         #     embed.add_field(name="Name Changed:", value=f"{now}{after.name}\nBefore: {before.name}")
 
         return embed if len(embed.fields) > 0 else None
+
+
+    def determine_changed_overrides(self, embed, before, after):
+        change_msgs = []
+        for key, before_overwrites in before.overwrites.items():
+            after_overwrites = after.overwrites[key] if key in after.overwrites else None
+            if before_overwrites != after_overwrites:
+                log.info(f"{key.name}: are NOT equal")
+                _type = f"Role" if isinstance(key, discord.Role) else f"Member"
+                header = f"{_type} Permission Overwrites for {key.name}:\n"
+                if after_overwrites is not None:
+                    after_set = set(after_overwrites)
+                    before_set = set(before_overwrites)
+
+                    # Get the items that are unique from the after overwrites
+                    changes = after_set.difference(before_set)
+                    changes_msg = []
+                    for i in changes:
+                        perm_name = string.capwords(f"{i[0]}".replace('_', ' '))
+                        if i[1] is None:
+                            perm_status = "Inherit"
+                        else:
+                            perm_status = "Allow" if i[1] is True else "Deny"
+
+                        changes_msg.append(f"**{perm_name}** is now set to **{perm_status}**")
+
+                    body = "\n".join(changes_msg)
+                else:
+                    body = f"Permission Overwrites Removed"
+
+                change_msgs.append((header, body))
+                logging.warning(header + body)
+
+        if len(change_msgs) > 0:
+            embed.add_field(name="__Channel Permission Overrides Changed:__", value=f"\N{zero width space}",
+                            inline=False)
+            for change in change_msgs:
+                embed.add_field(name=change[0], value=change[1], inline=False)
+        return embed
+
 
 
     def get_voice_ch_update_embed(self, before: discord.VoiceChannel, after: discord.VoiceChannel):
