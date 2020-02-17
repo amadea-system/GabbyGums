@@ -4,18 +4,67 @@ For use with Gabby Gums
 """
 
 
+import time
+import json
 import logging
 import functools
-from dataclasses import dataclass, field
+import statistics as stats
 from typing import List, Optional
-import time
+from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-import json
 
 import asyncpg
 from discord import Invite, Message
+
 import GuildConfigs
 
+
+class DBPerformance:
+
+    def __init__(self):
+        self.time = defaultdict(list)
+
+    def avg(self, key: str):
+        return stats.mean(self.time[key])
+
+    def all_avg(self):
+        avgs = {}
+        for key, value in self.time.items():
+            avgs[key] = stats.mean(value)
+        return avgs
+
+    def stats(self):
+        statistics = {}
+        for key, value in self.time.items():
+            loop_stats = {}
+            try:
+                loop_stats['avg'] = stats.mean(value)
+            except stats.StatisticsError:
+                loop_stats['avg'] = -1
+
+            try:
+                loop_stats['med'] = stats.median(value)
+            except stats.StatisticsError:
+                loop_stats['med'] = -1
+
+            try:
+                loop_stats['max'] = max(value)
+            except stats.StatisticsError:
+                loop_stats['max'] = -1
+
+            try:
+                loop_stats['min'] = min(value)
+            except stats.StatisticsError:
+                loop_stats['min'] = -1
+
+            loop_stats['calls'] = len(value)
+
+            statistics[key] = loop_stats
+        return statistics
+
+
+db_perf = DBPerformance()
 
 async def create_db_pool(uri: str) -> asyncpg.pool.Pool:
 
@@ -38,6 +87,8 @@ def db_deco(func):
         try:
             response = await func(*args, **kwargs)
             end_time = time.perf_counter()
+            db_perf.time[func.__name__].append((end_time - start_time) * 1000)
+
             if len(args) > 1:
                 logging.info("DB Query {} from {} in {:.3f} ms.".format(func.__name__, args[1], (end_time - start_time) * 1000))
             else:

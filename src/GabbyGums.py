@@ -374,6 +374,8 @@ async def on_command_error(ctx, error):
         await ctx.send("⚠ {}".format(error))
     elif type(error) == discord.ext.commands.BadArgument:
         await ctx.send("⚠ {}".format(error))
+    elif isinstance(error, commands.CommandOnCooldown):
+        await ctx.send("⚠ {}".format(error))
     else:
         await ctx.send("⚠ {}".format(error))
         raise error

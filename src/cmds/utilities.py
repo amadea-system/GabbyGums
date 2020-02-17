@@ -20,6 +20,7 @@ import discord
 from discord.ext import commands
 
 import db
+from cogUtils.paginator import FieldPages
 # from embeds import member_nick_update
 
 if TYPE_CHECKING:
@@ -32,13 +33,12 @@ class Utilities(commands.Cog):
     def __init__(self, bot: 'GGBot'):
         self.bot = bot
 
-
     @commands.is_owner()
+    @commands.cooldown(rate=1, per=10, type=commands.BucketType.default)
     @commands.guild_only()
     @commands.command(brief="Owner only test command")
     async def cogtest(self, ctx: commands.Context):
         assert 1 == 0
-
 
     @commands.command(name='bot_invite',
                       brief='Get an invite for Gabby Gums.',
@@ -108,8 +108,12 @@ class Utilities(commands.Cog):
         disk_space_free = disk_usage.free / 1024 / 1024
         disk_space_used = disk_usage.used / 1024 / 1024
         disk_space_percent_used = disk_usage.percent
-        image_cache_du_used = folder_size("./image_cache/") / 1024 / 1024
-        num_of_files_in_cache = sum([len(files) for r, d, files in os.walk("./image_cache/")])
+        try:
+            image_cache_du_used = folder_size("./image_cache/") / 1024 / 1024
+            num_of_files_in_cache = sum([len(files) for r, d, files in os.walk("./image_cache/")])
+        except FileNotFoundError as e:
+            image_cache_du_used = -1
+            num_of_files_in_cache = -1
 
         num_of_db_cached_messages = await db.get_number_of_rows_in_messages(self.bot.db_pool)
         try:
@@ -128,7 +132,6 @@ class Utilities(commands.Cog):
                                      len(self.bot.guilds)), color=0x00b7fa)
 
         await ctx.send(embed=embed)
-
 
     @commands.command(name="verify_perm", aliases=["verify_permissions", "permissions", "perm", "permissions_check", "perm_check"],
                       brief="Checks for any permissions or configuration problems.",
@@ -281,6 +284,47 @@ class Utilities(commands.Cog):
             embed.description = "No problems found!"
 
         await ctx.send(embed=embed)
+
+    @commands.cooldown(rate=1, per=10, type=commands.BucketType.default)
+    @commands.command(aliases=["db_stats", "db_performance"],
+                      brief="Shows various time stats for the database.",)
+    async def db_perf(self, ctx: commands.Context):
+
+        embed_entries = []
+        stats = db.db_perf.stats()
+
+        for key, value in stats.items():
+            # Don't bother showing stats for one offs
+            if key != 'create_tables' and key != 'migrate_to_latest':
+                header = f"{key}"
+
+                msg_list = []
+                for sub_key, sub_value in value.items():
+                    if sub_key == "calls":
+                        msg_list.append(f"{sub_key}: {sub_value:.0f}")
+                    else:
+                        msg_list.append(f"{sub_key}: {sub_value:.2f}")
+
+                if len(msg_list) > 0:
+                    msg = "\n".join(msg_list)
+                    embed_entries.append((header, msg))
+
+        page = FieldPages(ctx, entries=embed_entries, per_page=15)
+        page.embed.title = f"DB Statistics:"
+        await page.paginate()
+
+    @commands.Cog.listener()
+    async def on_command_error(self, ctx, error):
+
+        if 'error_log_channel' not in self.bot.config:
+            return
+        error_log_channel = self.bot.get_channel(self.bot.config['error_log_channel'])
+
+        if isinstance(error, commands.CommandOnCooldown):
+            # DDOS Protection. Send alerts in the error log if we are potentially being DDOSed with resource intensive commands.
+            # Only in this cog atm as these are the high risk items.
+            await error_log_channel.send(f"⚠ Excessive use of {ctx.command.module}.{ctx.command.name} by {ctx.author} ({ctx.author.id}) in {ctx.guild} ⚠ ")
+            return
 
 
 def setup(bot):
