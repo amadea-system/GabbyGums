@@ -323,7 +323,7 @@ class Utilities(commands.Cog):
         if isinstance(error, commands.CommandOnCooldown):
             # DDOS Protection. Send alerts in the error log if we are potentially being DDOSed with resource intensive commands.
             # Only in this cog atm as these are the high risk items.
-            await error_log_channel.send(f"⚠ Excessive use of {ctx.command.module}.{ctx.command.name} by {ctx.author} ({ctx.author.id}) in {ctx.guild} ⚠ ")
+            await error_log_channel.send(f"⚠ Excessive use of {ctx.command.module}.{ctx.command.name} by <@{ctx.author}> ({ctx.author.id}) in {ctx.guild} ⚠ ")
             return
 
 
