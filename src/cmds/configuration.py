@@ -140,7 +140,7 @@ class Configuration(commands.Cog):
         if event_type_rsp is None:
             return
 
-        edit_buttons = [('🔀', 'toggle'), ('<:backbtn:677188923310735361>', 'back')]#('🔙', 'back')]  # , ('🛑', 'stop')]
+        edit_buttons = [('🔀', 'toggle'), ('<:backbtn:679032730243301397>', 'back')]#('🔙', 'back')]  # , ('🛑', 'stop')]
 
         # edit_msg = None
         while True:
