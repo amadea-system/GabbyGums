@@ -355,6 +355,12 @@ async def test_cmd(ctx: commands.Context):
 # ---- Command Error Handling ----- #
 @client.event
 async def on_command_error(ctx, error):
+
+    # https://gist.github.com/EvieePy/7822af90858ef65012ea500bcecf1612
+    # This prevents any commands with local handlers being handled here in on_command_error.
+    if hasattr(ctx.command, 'on_error'):
+        return
+
     if type(error) == discord.ext.commands.NoPrivateMessage:
         await ctx.send("⚠ This command can not be used in DMs!!!")
         return

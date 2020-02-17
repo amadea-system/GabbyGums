@@ -10,14 +10,14 @@ Part of the Gabby Gums Discord Logger.
 
 # import asyncio
 import logging
-from typing import TYPE_CHECKING, Optional, Dict, List, Union, Tuple, NamedTuple
+from typing import TYPE_CHECKING, Optional, Dict, List, Union, Tuple, NamedTuple, Type, Any
 
 import discord
 from discord.ext import commands
 
 import db
 import utils
-from uiElements import StringPage, StringReactPage
+from uiElements import StringPage, StringReactPage, Page
 from GuildConfigs import GuildLoggingConfig, EventConfig
 
 if TYPE_CHECKING:
@@ -81,6 +81,29 @@ class Configuration(commands.Cog):
     def __init__(self, bot: 'GGBot'):
         self.bot = bot
 
+    async def handle_errors(self, ctx: commands.Context, error: Type[Exception], errors_to_ignore: Tuple[Type[Exception]]):
+
+        if len(errors_to_ignore) > 0 and isinstance(error, errors_to_ignore):
+            # Don't handle exceptions that have already been handled.
+            return
+
+        if isinstance(error, commands.NoPrivateMessage):
+            await ctx.send("⚠ This command can not be used in DMs!!!")
+            return
+        elif isinstance(error, commands.CommandNotFound):
+            await ctx.send("⚠ Invalid Command!!!")
+            return
+        elif isinstance(error, commands.MissingPermissions):
+            await ctx.send(
+                "⚠ You need the **Manage Messages** permission to use this command".format(error.missing_perms))
+            return
+        elif isinstance(error, commands.MissingRequiredArgument):
+            await ctx.send("⚠ {}".format(error))
+        elif isinstance(error, commands.BadArgument):
+            await ctx.send("⚠ {}".format(error))
+        else:
+            await ctx.send("⚠ {}".format(error))
+            raise error
 
     @commands.is_owner()
     @commands.guild_only()
@@ -91,6 +114,7 @@ class Configuration(commands.Cog):
 
     # region Event Configuration Menu System
     @commands.has_permissions(manage_messages=True)
+    @commands.max_concurrency(1, per=commands.BucketType.member, wait=False)
     @commands.guild_only()
     @commands.command(name="events", aliases=['event', 'configure_events', "setup_events", "config_event"],
                       brief="Allows for setting per event log channels and/or disabling specific events from being logged.",
@@ -99,6 +123,13 @@ class Configuration(commands.Cog):
     async def configure_event(self, ctx: commands.Context):
         await self.config_event_menu(ctx)
 
+    @configure_event.error
+    async def configure_event_error(self, ctx: commands.Context, error):
+        if isinstance(error, commands.MaxConcurrencyReached):
+            # await ctx.send('The Event Configuration Menu is already running!')
+            pass
+
+        await self.handle_errors(ctx, error, (commands.MaxConcurrencyReached,))
 
     async def config_event_menu(self, ctx: commands.Context, previous_ui_element: Optional[discord.Message] = None):
         event_configs = await db.get_server_log_configs(ctx.bot.db_pool, ctx.guild.id)
