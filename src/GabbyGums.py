@@ -103,6 +103,8 @@ async def on_ready():
     for guild in client.guilds:
         await update_invite_cache(guild)
 
+    logging.warning("Gabby Gums is fully loaded.")
+
 
 # ----- Help & About Commands ----- #
 @client.command(name="Help", hidden=True)
