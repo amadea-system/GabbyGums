@@ -90,9 +90,9 @@ def db_deco(func):
             db_perf.time[func.__name__].append((end_time - start_time) * 1000)
 
             if len(args) > 1:
-                logging.info("DB Query {} from {} in {:.3f} ms.".format(func.__name__, args[1], (end_time - start_time) * 1000))
+                logging.debug("DB Query {} from {} in {:.3f} ms.".format(func.__name__, args[1], (end_time - start_time) * 1000))
             else:
-                logging.info("DB Query {} in {:.3f} ms.".format(func.__name__, (end_time - start_time) * 1000))
+                logging.debug("DB Query {} in {:.3f} ms.".format(func.__name__, (end_time - start_time) * 1000))
             return response
         except asyncpg.exceptions.PostgresError:
             logging.exception("Error attempting database query: {} for server: {}".format(func.__name__, args[1]))
