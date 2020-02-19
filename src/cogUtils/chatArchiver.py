@@ -28,8 +28,6 @@ def generate_txt_archive(messages: List['CompositeMessage'], channel_name) -> St
         else:
             content = "----Message contained no text----"
 
-        # content = message.content or "Embed coming soon UwU"
-
         if message.is_pk:
             author_info = f"System ID: {message.system_id}, Member ID: {message.member_id}"
         else:
@@ -39,7 +37,6 @@ def generate_txt_archive(messages: List['CompositeMessage'], channel_name) -> St
         msg = f"[{message.created_at.strftime('%Y-%m-%d %H:%M:%S-UTC')}] {message.user_name_and_discrim} ({author_info}):" \
               f"\n    {content}\n\n"
         lines.append(msg)
-        # archive.write(line)
 
     archive.write(f"{len(lines)} messages archived from #{channel_name} @ {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S-UTC')}\n\n")
     for line in lines:
