@@ -284,7 +284,10 @@ class Archive(commands.Cog):
     @commands.has_permissions(manage_messages=True)
     @commands.cooldown(rate=1, per=10, type=commands.BucketType.guild)
     @commands.max_concurrency(1, per=commands.BucketType.guild, wait=False)
-    @commands.command(name="txt_archive")
+    @commands.is_owner()
+    @commands.command(name="txt_archive",
+                      brief="Recod.",
+                      description="adw")
     async def txt_archive(self, ctx: commands.Context, number_of_msg: int):
         channel: discord.TextChannel = ctx.channel
 
@@ -333,7 +336,9 @@ class Archive(commands.Cog):
     @commands.has_permissions(manage_messages=True)
     @commands.cooldown(rate=1, per=10, type=commands.BucketType.guild)
     @commands.max_concurrency(1, per=commands.BucketType.guild, wait=False)
-    @commands.command(name="archive")
+    @commands.command(name="archive",
+                      brief="Creates an archive file for the number of messages specified.",
+                      description="Creates an archive file for the number of messages specified.")
     async def archive(self, ctx: commands.Context, number_of_msg: int):
         channel: discord.TextChannel = ctx.channel
 
@@ -348,7 +353,6 @@ class Archive(commands.Cog):
         # Todo: Figure out the best number of max number of msg
         # Todo: Date/Time/snowflake Option?
 
-        # Todo: Add archive specific cooldown error handling
         # Todo: Add archive specific max concurancy error handling
 
         await ctx.send(
@@ -385,6 +389,7 @@ class Archive(commands.Cog):
         #     end_time = time.perf_counter()
         #     await ctx.send(f"Archived {number_of_msg} messages in {(end_time - start_time):.2f} seconds.",
         #                    file=discord.File(archive_file, filename=file_name))
+        log.info(f"Archived {number_of_msg} messages for storage in {ctx.guild.id}.")
 
 
 class BulkMsgDelete(commands.Cog):
