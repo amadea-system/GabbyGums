@@ -356,7 +356,7 @@ class Archive(commands.Cog):
         # Todo: Add archive specific max concurancy error handling
 
         await ctx.send(
-            f"Beginning archive of the last {number_of_msg} messages. This may take a while for large numbers of messages.")
+            f"Beginning archive of the last {number_of_msg} messages.")
 
         start_time = time.perf_counter()
         async with channel.typing():
