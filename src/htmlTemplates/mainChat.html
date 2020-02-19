@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {# meta data #}
+    <title>{{ ctx.guild.name | e }} - {{ ctx.channel.name | e }}</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+
+    {# style sheets #}
+    <style>
+        {% include 'core.css' %}
+    </style>
+    <style>
+        {% include 'darkTheme.css' %}
+    </style>
+
+    {# syntax highlighting #}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.6/styles/{{HighlightJsStyleName}}.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.6/highlight.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.pre--multiline').forEach(block => hljs.highlightBlock(block));
+        });
+    </script>
+
+    {# Local scripts #}
+    <script>
+        function scrollToMessage(event, id) {
+            var element = document.getElementById('message-' + id);
+
+            if (element) {
+                event.preventDefault();
+
+                element.classList.add('chatlog__message--highlighted');
+
+                window.scrollTo({
+                    top: element.getBoundingClientRect().top - document.body.getBoundingClientRect().top - (window.innerHeight / 2),
+                    behavior: 'smooth'
+                });
+
+                window.setTimeout(function() {
+                    element.classList.remove('chatlog__message--highlighted');
+                }, 2000);
+            }
+        }
+    </script>
+
+</head>
+<body>
+
+
+<div class="preamble">
+    <div class="preamble__guild-icon-container">
+        {% if ctx.guild.icon_url %}
+        <img class="preamble__guild-icon" src="{{ ctx.guild.icon_url }}" alt="Guild icon" />
+        {% else %}
+        <img class="preamble__guild-icon" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Guild icon" />
+        {% endif %}
+    </div>
+    <div class="preamble__entries-container">
+        <div class="preamble__entry">{{ ctx.guild.name | e }}</div>
+        <div class="preamble__entry">{{ ctx.channel.name | e }}</div>
+
+        {% if ctx.channel.topic %}
+            <div class="preamble__entry preamble__entry--small">{{ ctx.channel.topic | e }}</div>
+        {% endif %}
+
+        {#
+        {% if Context.After || Context.Before %}
+            <div class="preamble__entry preamble__entry--small">
+                {% if Context.After && Context.Before %}
+                    Between {{ Context.After | FormatDate | e }} and {{ Context.Before | FormatDate | e }}
+                {% else if Context.After %}
+                    After {{ Context.After | FormatDate | e }}
+                {% else if Context.Before %}
+                    Before {{ Context.Before | FormatDate | e }}
+                {% endif %}
+            </div>
+        {% endif %}
+        #}
+        <div class="postamble__entry"> <br></div>
+        <div class="postamble__entry">Archived {{ msg_count }} messages</div>
+    </div>
+</div>
+
+<!--{# Postamble #}-->
+<!--<div class="postamble">-->
+    <!--<div class="postamble__entry">Archived {{ msg_count }} messages</div>-->
+<!--</div>-->
+
+
+<div class="chatlog">
+    {% include 'messageGroup.html' %}
+</div>
+
+
+</body>
+</html>

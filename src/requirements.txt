@@ -3,3 +3,4 @@ discord.py>=1.2.5
 psutil
 pillow
 fuzzywuzzy[speedup]
+jinja2
