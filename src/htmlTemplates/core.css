@@ -353,6 +353,20 @@ img {
     font-weight: 500;
 }
 
+.chatlog__pk-tag {
+    position: relative;
+    top: -.2em;
+    margin-left: 0.3em;
+    padding: 0.05em 0.3em;
+    border-radius: 3px;
+    vertical-align: middle;
+    line-height: 1.3;
+    background: #f67b23;
+    color: #ffffff;
+    font-size: 0.625em;
+    font-weight: 500;
+}
+
 /* Postamble */
 
 .postamble {
