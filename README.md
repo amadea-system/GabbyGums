@@ -16,7 +16,10 @@ Logs the following:
 * Account name changes
 * Account Avatar changes
 * Bans, Unbans, and Kicks
- * Including the person who did the Banning/Unbanning/Kicking
+  * Including the person who did the Banning/Unbanning/Kicking
+* Bulk Message Deletes
+  * Bulk Message Delete Logs are generated as a HTML Web Page to give an easy to visualize, Discord like view of the deleted messages that supports shows not just the message content, but Reactions and Embeds just how they looked on discord. Additionally System IDs, and Member IDs are included for PK posts.
+  * These logs can also be generated using the g!archive command. 
 
 All of the different logged events are able to have their own log channels or be disabled entirely.  
 Able to ignore events based on Channel, Category, and/or user.
