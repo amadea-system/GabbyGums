@@ -7,7 +7,7 @@
 
         <div class="chatlog__messages">
             {# Author name and timestamp #}
-            <span class="chatlog__author-name" title="{{ msg_group.username | e }}" data-user-id="{{  msg_group.author.id | e }}">{{ msg_group.author_display_name | e }}</span>
+            <span class="chatlog__author-name" title="{{ msg_group.author_username | e }}" data-user-id="{{  msg_group.author.id | e }}">{{ msg_group.author_display_name | e }}</span>
 
             {# Bot Tag #}
             {% if msg_group.is_pk %}
