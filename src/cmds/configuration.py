@@ -18,12 +18,13 @@ from discord.ext import commands
 import db
 import utils
 from uiElements import StringPage, StringReactPage, Page
-from GuildConfigs import GuildLoggingConfig, EventConfig
+from GuildConfigs import GuildLoggingConfig, EventConfig, GuildConfigDocs
 
 if TYPE_CHECKING:
     from bot import GGBot
 
 log = logging.getLogger(__name__)
+guild_config_docs = GuildConfigDocs()
 
 
 # region Embed Getters
@@ -38,15 +39,16 @@ async def get_event_configuration_embed(ctx: commands.Context, event_configs: Gu
 
     event_config_msg_fragments = []
     for event_type in event_configs.available_event_types():
+        event_config_msg_fragments.append(f"**{event_type}:**\n⁃ _{guild_config_docs[event_type].brief}_")
         event = event_configs[event_type]
         if event is None or (event.log_channel_id is None and event.enabled):
-            event_config_msg_fragments.append(f"**{event_type}:**\n{default_msg}\n")
+            event_config_msg_fragments.append(f"⁃ {default_msg}\n")
         elif not event.enabled:
-            event_config_msg_fragments.append(f"**{event_type}:**\nEvent Currently Disabled\n")
+            event_config_msg_fragments.append(f"⁃ Event Currently Disabled\n")
         else:
-            event_config_msg_fragments.append(f"**{event_type}:**\nLogging to <#{event.log_channel_id}>\n")
+            event_config_msg_fragments.append(f"⁃ Logging to <#{event.log_channel_id}>\n")
 
-    event_config_msg_fragments.append(f"\n\n**Enter an event type to edit it's settings**")
+    event_config_msg_fragments.append(f"\n\n**Enter an event type to edit it's settings or click the 🛑 to exit**")
 
     event_config_msg = "\n".join(event_config_msg_fragments)
 
@@ -64,8 +66,8 @@ def get_edit_event_embed(event_type_name: str, event_configs: GuildLoggingConfig
     enable_text = "Yes" if configs.enabled else "No"
     onoff_toggle_text = "Off" if configs.enabled else "On"
     log_channel = f"<#{configs.log_channel_id}>" if configs.log_channel_id else "Default Log Channel"
-    msg = f"Enabled: {enable_text}\n" \
-        f"Current Log Channel: {log_channel}\n\n\n" \
+    msg = f"_{guild_config_docs[event_type_name].full}_\n\nEnabled: **{enable_text}**\n" \
+        f"Current Log Channel: **{log_channel}**\n\n\n" \
         f"**Click** the 🔀 to turn this event **{onoff_toggle_text}**.\n" \
         f"**Enter** a **new log channel** to change which channel this event will log to.\n" \
         f"**Enter** `clear` to set the logging channel back to the **default log channel**.\n" \

@@ -125,6 +125,67 @@ class GuildLoggingConfig:
         return configs
 
 
+class EventConfigDocs:
+    """Class for holding documentation for an event type"""
+    def __init__(self, brief: str, more: Optional[str] = None):
+        self.brief: str = brief
+        self._more: Optional[str] = more
+
+
+    def __str__(self):
+        return self.brief
+
+    @property
+    def more(self) -> str:
+        return self._more or ""
+
+    @property
+    def full(self) -> str:
+        if self._more is not None:
+            return f"{self.brief}\n{self._more}"
+        else:
+            return self.brief
+
+
+class GuildConfigDocs:
+    """Class for documenting the Guild Configuration Types"""
+
+    message_edit = EventConfigDocs('''Logs when messages are edited.''')
+    message_delete = EventConfigDocs('''Logs when messages are deleted and bulk message deletes.''', '''(This is typically when a member gets banned or if a "message purge" bot command is used).''')
+    member_join = EventConfigDocs('''Logs when a member joins your server and what invite they used.''', '''(Requires the `Manage Server` permission ONLY for invite tracking)''')
+    member_leave = EventConfigDocs('''Logs when a member leaves your server.''')
+    member_ban = EventConfigDocs("Logs when a member gets banned from your server.", "(Requires the `View Audit Log` permission ONLY to determine the moderator that did the banning and the reason)")
+    member_unban = EventConfigDocs("Logs when a member gets unbanned from your server.", "(Requires the `View Audit Log` permission ONLY to determine the moderator that did the unbanning and the reason)")
+    member_kick = EventConfigDocs("Logs when a member gets kicked from your server.", "(Requires the `View Audit Log` permission to work)")
+    member_avatar_change = EventConfigDocs("Logs when a member changes their avatar. (Off by default)")
+    guild_member_nickname = EventConfigDocs("Logs when a member changes their server nickname.")
+    username_change = EventConfigDocs("Logs when a member changes their Discord username or discriminator.")
+
+
+    def __getitem__(self, item):
+        t_key = item.lower()
+        class_members = [attr for attr in dir(self) if not callable(getattr(self, attr)) and not attr.startswith("__")]
+        for variable in class_members:
+            t_var = variable #.replace('_', '')
+            if t_var.lower() == t_key:
+                return getattr(self, variable)
+        raise KeyError('{} is not a valid key for type GuildLoggingConfig'.format(item))
+
+
+"""Short explanations about what each event does. """
+# guild_config_docs = {
+#     'message_edit': '''Logs when messages are edited.''',
+#     'message_delete': '''Logs when messages are deleted.\nAlso logs when a bulk message delete happens (This is typically when a member gets banned or if a "message purge" bot command is used). ''',
+#     'member_join': '''Logs when a member joins your server and what invite they used. (Requires the `Manage Server` permission ONLY for invite tracking)''',
+#     'member_leave': '''Logs when a member leaves your server.''',
+#     'member_ban': "Logs when a member gets banned from your server. (Requires the `View Audit Log` permission ONLY to determine the moderator that did the banning and the reason)",
+#     'member_unban': "Logs when a member gets unbanned from your server. (Requires the `View Audit Log` permission ONLY to determine the moderator that did the unbanning and the reason)",
+#     'member_kick': "Logs when a member gets kicked from your server. (Requires the `View Audit Log` permission to work)",
+#     'member_avatar_change': "Logs when a member changes their avatar. (Off by default)",
+#     'guild_member_nickname': "Logs when a member changes their server nickname.",
+#     'username_change': "Logs when a member changes their Discord username or discriminator.",
+# }
+
 def load_nested_dict(dc, _dict):
     try:
         fieldtypes = {f.name: f.type for f in fields(dc)}
