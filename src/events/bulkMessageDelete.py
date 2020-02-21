@@ -6,6 +6,7 @@ Logs from these event include:
 Part of the Gabby Gums Discord Logger.
 """
 
+import re
 import asyncio
 import time
 import logging
@@ -16,6 +17,8 @@ from typing import TYPE_CHECKING, Optional, Dict, List, Union, Tuple, NamedTuple
 
 import discord
 from discord.ext import commands
+
+from markupsafe import Markup, escape
 
 import db
 # import utils
@@ -30,6 +33,115 @@ log = logging.getLogger(__name__)
 class CannotReadMessageHistory(Exception):
     def __init__(self):
         super().__init__(f"⚠️Missing the `Read Message History` permission!\n")
+
+
+# class DiscordMarkdown:
+#
+#     codeblock_pattern = "```(?:([a-zA-Z0-9-]+?)\n+)?\n*([^`]+?)\n*```"  # Group 1 is Code Language (May be None), Group 2 is the content of the block
+#     blockQuote_pattern = None
+#     strikethrough = ""
+#
+#     # markdown.defaultRules.autolink
+
+
+class DiscordMarkdown:
+
+    codeblock_pattern = "```(?:([a-zA-Z0-9-]+?)\n+)?\n*([^`]+?)\n*```"  # Multiline. Group 1 is Code Language (May be None), Group 2 is the content of the block
+    blockQuote_pattern = None
+    # strikethrough = "~~([\S\s]+?)~~(?!_)"
+    # strikethrough_pattern = "~~([\S\s]+?)~~(?!_)"  # Singleline. G1 is content.
+    strikethrough_pattern = "(~~)(.+?)(~~)(?!_)"  # Singleline. G2 is content.
+    spoiler_pattern = "(\|\|)(.+?)(\|\|)"  # Singleline. G2 is content.
+    bold_pattern = "(\*\*)(.+?)(\*\*)"  # Singleline. G2 is content.
+    underline_pattern = "(__)(.+?)(__)"  # Singleline. G2 is content.
+    italics_pattern1 = "(\*)(.+?)(\*)"  # Singleline. G2 is content.
+    italics_pattern2 = "(_)(.+?)(_)"  # Singleline. G2 is content.  # TODO: impleement no whitespace
+
+
+    @classmethod
+    def replace(cls, input: str, replacement: str, start: int, end: int):
+        out = f"{input[:start]}{replacement}{input[end:]}"
+        return out
+
+    @classmethod
+    def replace_all(cls, input: str, start_tag: str, end_tag: str, start_group: int, end_group: int, pattern: str) -> str:
+        output = input
+        while True:
+            match = re.search(pattern, output)
+            if match is None:
+                break
+            output = cls.replace(output, end_tag, match.start(end_group), match.end(end_group))
+            output = cls.replace(output, start_tag, match.start(start_group), match.end(start_group))
+
+        return output
+
+
+    @classmethod
+    def spoiler(cls, input: str) -> str:
+        # group 1, group 3
+        first_tag = '<span class="spoiler">'
+        end_tag = "</span>"
+        output = cls.replace_all(input, first_tag, end_tag, 1, 3, cls.spoiler_pattern)
+        return output
+
+
+    @classmethod
+    def bold(cls, input: str) -> str:
+        # group 1, group 3
+        first_tag = '<strong>'
+        end_tag = "</strong>"
+        output = cls.replace_all(input, first_tag, end_tag, 1, 3, cls.bold_pattern)
+        return output
+
+
+    @classmethod
+    def underline(cls, input: str) -> str:
+        # group 1, group 3
+        first_tag = '<u>'
+        end_tag = "</u>"
+        output = cls.replace_all(input, first_tag, end_tag, 1, 3, cls.underline_pattern)
+        return output
+
+
+    @classmethod
+    def italics(cls, input: str) -> str:
+        # group 1, group 3
+        first_tag = '<em>'
+        end_tag = "</em>"
+        output = cls.replace_all(input, first_tag, end_tag, 1, 3, cls.italics_pattern1)
+        output = cls.replace_all(output, first_tag, end_tag, 1, 3, cls.italics_pattern2)
+        return output
+
+
+    @classmethod
+    def strikethrough(cls, input: str):
+        # group 1, group 3
+        first_tag = "<s>"
+        end_tag = "</s>"
+        # output = input
+        # # matches = []
+        # while True:
+        #     match = re.search(cls.strikethrough_pattern, output)
+        #     if match is None:
+        #         break
+        #     output = cls.replace(output, end_tag, match.start(3), match.end(3))
+        #     output = cls.replace(output, first_tag, match.start(1), match.end(1))
+        output = cls.replace_all(input, first_tag, end_tag, 1, 3, cls.strikethrough_pattern)
+        return output
+
+
+    @classmethod
+    def markdown(cls, input: str) -> str:
+
+        output = cls.spoiler(input)
+        output = cls.strikethrough(output)
+        output = cls.bold(output)
+        output = cls.underline(output)
+        output = cls.italics(output)
+        return output
+
+
+markdown = DiscordMarkdown()
 
 
 class CompositeMessage:
@@ -71,7 +183,9 @@ class CompositeMessage:
         if self.db_msg is None and self.mem_msg is None:
             return "Message was not in the cache"
 
-        return self.mem_msg.content if self.mem_msg is not None else self.db_msg.content
+        output = self.mem_msg.content if self.mem_msg is not None else self.db_msg.content
+        safe_output = escape(output)
+        return Markup(markdown.markdown(safe_output))
 
     @property
     def created_at(self) -> Optional[datetime]:
