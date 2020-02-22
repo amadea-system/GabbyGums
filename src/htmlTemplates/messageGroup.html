@@ -1,0 +1,83 @@
+    {% for msg_group in msg_groups %}
+    <div class="chatlog__message-group">
+        {# Avatar #}
+        <div class="chatlog__author-avatar-container">
+            <img class="chatlog__author-avatar" src="{{ msg_group.author_pfp }}" alt="Avatar" />
+        </div>
+
+        <div class="chatlog__messages">
+            {# Author name and timestamp #}
+            <span class="chatlog__author-name" title="{{ msg_group.author_username | e }}" data-user-id="{{  msg_group.author.id | e }}">{{ msg_group.author_display_name | e }}</span>
+
+            {# Bot Tag #}
+            {% if msg_group.is_pk %}
+            <span class="chatlog__pk-tag">PluralKit</span>
+            {% elif msg_group.author.bot %}
+            <span class="chatlog__bot-tag">BOT</span>
+            {% endif %}
+
+            {# Timestamp #}
+            <span class="chatlog__timestamp">{{ msg_group.created_at.strftime('%d/%m/%Y %H:%M:%S UTC') | e }}    {{msg_group.author_info}}</span>
+
+            {# Messages (content from all consecutive msgs from this user) #}
+            {% if msg_group.uncached_group %}
+            <div class="chatlog__message">
+                <div class="chatlog__content">
+                    <span class="markdown">{{ msg_group.count}} Message(s) not in the cache.</span>
+                </div>
+            </div>
+            {% else %}
+            {% for msg in msg_group %}
+            <div class="chatlog__message {{'chatlog__message--pinned' if msg.pinned }}" data-message-id="{{ msg.id }}" id="message-{{ msg.id }}"> {# TODO: Pinned msg? #}
+                {% if msg.content %}
+                <div class="chatlog__content">
+                    <span class="markdown">{{ msg.content | e }}</span> {# markdown |  #}
+                    {# Edited timestamp #}
+                    {% if msg.edited_at %}
+                    <span class="chatlog__edited-timestamp" title="{{ msg.edited_at.strftime('%d/%m/%Y %H:%M:%S UTC') | e }}">(edited)</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                {# Attachments #}
+                {% for attachment in msg.attachments %}
+                <div class="chatlog__attachment">
+                    <a href="{{ attachment.url }}">
+                            {# Image #}
+                        {# TODO: Handle Video attachments #}
+                        {% if attachment.height and not attachment.is_spoiler() %}
+                            <img class="chatlog__attachment-thumbnail" src="{{ attachment.url }}" alt="Attachment" />
+                        {% else %}
+                            {# Non-image #}
+                            Attachment: {{ attachment.filename }} ({{ "{} Kb".format(attachment.size //1024) if attachment.size < 1048576 else "{:.2f} Mb".format(attachment.size//1024/1024)}})
+                        {% endif %}
+                    </a>
+                </div>
+                {% endfor %}
+
+                {# TODO: embeds #}
+
+                {# Reactions #}
+                {% if msg.reactions |length > 0 %}
+                <div class="chatlog__reactions">
+                    {% for reaction in msg.reactions %}
+                        <div class="chatlog__reaction">
+                            {% if reaction.custom_emoji %}
+                            <img class="emoji emoji--small" alt="{{ reaction.emoji.name }}" title="{{ reaction.emoji.name }}" src="{{ reaction.emoji.url }}" />
+                            {% else %}
+                            <span class="emoji emoji--small">{{ reaction.emoji }}</span>
+                            {% endif %}
+                            <span class="chatlog__reaction-count">{{ reaction.count }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+        {# TODO: End of Multiple messages loop #}
+
+    </div>
+    {% endfor %}

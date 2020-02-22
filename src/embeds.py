@@ -66,15 +66,13 @@ def edited_message(author_id, author_name: str, author_discrim, channel_id, befo
     if len(before_msg) > 1024 or len(after_msg) > 1024:  # To simplify things, if one is greater split both
         before_msg1, before_msg2 = split_message(before_msg)
         after_msg1, after_msg2 = split_message(after_msg)
-        embed.add_field(name="Message Before Edit:", value=before_msg1, inline=True)
+        embed.add_field(name="Message Before Edit:", value=before_msg1, inline=False)
         if len(before_msg2.strip()) > 0:
-            print("before_msg2: {}".format(before_msg2))
-            embed.add_field(name="Message Before Edit Continued:", value=before_msg2, inline=True)
+            embed.add_field(name="Message Before Edit Continued:", value=before_msg2, inline=False)
 
-        embed.add_field(name="Message After Edit:", value=after_msg1, inline=True)
+        embed.add_field(name="Message After Edit:", value=after_msg1, inline=False)
         if len(after_msg2.strip()) > 0:
-            print("after_msg2: {}\n\n".format(after_msg2))
-            embed.add_field(name="Message After Edit Continued:", value=after_msg2, inline=True)
+            embed.add_field(name="Message After Edit Continued:", value=after_msg2, inline=False)
     else:
         embed.add_field(name="Message Before Edit:", value=before_msg, inline=True)
         embed.add_field(name="Message After Edit:", value=after_msg, inline=True)

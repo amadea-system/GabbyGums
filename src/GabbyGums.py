@@ -806,40 +806,45 @@ async def on_member_join(member: discord.Member):
 
 @client.event
 async def on_member_remove(member: discord.Member):
-    event_type = "member_leave"
+    event_type_leave = "member_leave"
+    event_type_kick = "member_kick"
 
-    log_channel = await get_event_or_guild_logging_channel(client.db_pool, member.guild.id, event_type)
-    if log_channel is None:
+    leave_log_channel = await get_event_or_guild_logging_channel(client.db_pool, member.guild.id, event_type_leave)
+    kick_log_channel = await get_event_or_guild_logging_channel(client.db_pool, member.guild.id, event_type_kick)
+    if leave_log_channel is None and kick_log_channel is None:
         # Silently fail if no log channel is configured.
         return
     # We have a log channel. Start pulling audit logs and doing stuff
 
-    guild: discord.Guild = member.guild
-    try:
-        audit_log_entries = await utils.get_audit_logs(guild, discord.AuditLogAction.kick, member, timedelta(seconds=30))
-        if len(audit_log_entries) > 0:
-            # Assume the latest entry is the correct entry.
-            # Todo: Maybe Look at the time data and reject if it's too old? Kinda redundent though since we already filter them all out...
-            audit_log = audit_log_entries[0]
-            # reason = f" because: {audit_log.reason}" if audit_log.reason else ". No Reason was given"
-            logging.info(f"Got Audit log entries")
-            # return
-        else:
-            logging.info(f"No audit log entries present")
-            audit_log = None
+    if kick_log_channel is not None:  # Don't try to see if it's a kick if we shouldn't log kicks
+        guild: discord.Guild = member.guild
+        try:
+            audit_log_entries = await utils.get_audit_logs(guild, discord.AuditLogAction.kick, member, timedelta(seconds=30))
+            if len(audit_log_entries) > 0:
+                # Assume the latest entry is the correct entry.
+                # Todo: Maybe Look at the time data and reject if it's too old? Kinda redundent though since we already filter them all out...
+                audit_log = audit_log_entries[0]
+                # reason = f" because: {audit_log.reason}" if audit_log.reason else ". No Reason was given"
+                # logging.info(f"Got Audit log entries")
+                # return
+            else:
+                # logging.info(f"No audit log entries present")
+                audit_log = None
 
-    except utils.MissingAuditLogPermissions:
-        # log.info(f"{member.name} left.")
-        # log.info(f"Gabby Gums needs the View Audit Log permission to display who kicked the member.")
-        logging.info("Need more perms")
+        except utils.MissingAuditLogPermissions:
+            # log.info(f"{member.name} left.")
+            # log.info(f"Gabby Gums needs the View Audit Log permission to display who kicked the member.")
+            # logging.info("Need more perms")
+            audit_log = None
+    else:
         audit_log = None
 
-    if audit_log is not None:
+    if audit_log is not None and kick_log_channel is not None:
         embed = embeds.member_kick(member, audit_log)
-    else:
+        await kick_log_channel.send(embed=embed)
+    elif leave_log_channel is not None:
         embed = embeds.member_leave(member)
-
-    await log_channel.send(embed=embed)
+        await leave_log_channel.send(embed=embed)
 
 
 @client.event
