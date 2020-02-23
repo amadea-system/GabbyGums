@@ -67,10 +67,9 @@ class GuildLoggingConfig:
     guild_member_nickname: EventConfig = None
     username_change: EventConfig = None
     # bulk_message_delete: EventConfig = None
-    # username_change: EventConfig = None
-    # channel_create: EventConfig = None
-    # channel_delete: EventConfig = None
-    # channel_update: EventConfig = None
+    channel_create: EventConfig = None
+    channel_delete: EventConfig = None
+    channel_update: EventConfig = None
     # role_create: EventConfig = None
     # role_delete: EventConfig = None
     # role_update: EventConfig = EventConfig(enabled=False)
@@ -80,8 +79,7 @@ class GuildLoggingConfig:
     # voice_channel_switch: EventConfig = None
     # guild_member_update: EventConfig = None
     # guild_update: EventConfig = None
-    # guild_ban_add: EventConfig = None
-    # guild_ban_remove: EventConfig = None
+
 
     def __setitem__(self, key, value):
         t_key = key.lower()
@@ -160,6 +158,9 @@ class GuildConfigDocs:
     member_avatar_change = EventConfigDocs("Logs when a member changes their avatar. (Off by default)")
     guild_member_nickname = EventConfigDocs("Logs when a member changes their server nickname.")
     username_change = EventConfigDocs("Logs when a member changes their Discord username or discriminator.")
+    channel_create = EventConfigDocs("Logs when a channel is created in your server.")
+    channel_delete = EventConfigDocs("Logs when a channel is deleted in your server.")
+    channel_update = EventConfigDocs("Logs when a channel is changed in your server.\n(Position changes and person who created/updated/deleted channel coming soon!)")
 
 
     def __getitem__(self, item):
@@ -169,22 +170,7 @@ class GuildConfigDocs:
             t_var = variable #.replace('_', '')
             if t_var.lower() == t_key:
                 return getattr(self, variable)
-        raise KeyError('{} is not a valid key for type GuildLoggingConfig'.format(item))
-
-
-"""Short explanations about what each event does. """
-# guild_config_docs = {
-#     'message_edit': '''Logs when messages are edited.''',
-#     'message_delete': '''Logs when messages are deleted.\nAlso logs when a bulk message delete happens (This is typically when a member gets banned or if a "message purge" bot command is used). ''',
-#     'member_join': '''Logs when a member joins your server and what invite they used. (Requires the `Manage Server` permission ONLY for invite tracking)''',
-#     'member_leave': '''Logs when a member leaves your server.''',
-#     'member_ban': "Logs when a member gets banned from your server. (Requires the `View Audit Log` permission ONLY to determine the moderator that did the banning and the reason)",
-#     'member_unban': "Logs when a member gets unbanned from your server. (Requires the `View Audit Log` permission ONLY to determine the moderator that did the unbanning and the reason)",
-#     'member_kick': "Logs when a member gets kicked from your server. (Requires the `View Audit Log` permission to work)",
-#     'member_avatar_change': "Logs when a member changes their avatar. (Off by default)",
-#     'guild_member_nickname': "Logs when a member changes their server nickname.",
-#     'username_change': "Logs when a member changes their Discord username or discriminator.",
-# }
+        raise KeyError('{} is not a valid key for type GuildConfigDocs'.format(item))
 
 def load_nested_dict(dc, _dict):
     try:
