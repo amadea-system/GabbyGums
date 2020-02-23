@@ -6,19 +6,20 @@ Logs from these event include:
 Part of the Gabby Gums Discord Logger.
 """
 
-import re
 import asyncio
 import time
 import logging
 
 from random import randint
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional, Dict, List, Union, Tuple, NamedTuple
+from typing import TYPE_CHECKING, Optional, Dict, List, Union, Tuple, NamedTuple, Match, Pattern
 
 import discord
 from discord.ext import commands
+import regex as re  # Using external regex lib as it's slightly faster and offers more features.
+# from markupsafe import Markup, escape
+from jinja2 import Markup, escape
 
-from markupsafe import Markup, escape
 
 import db
 # import utils
@@ -35,109 +36,167 @@ class CannotReadMessageHistory(Exception):
         super().__init__(f"⚠️Missing the `Read Message History` permission!\n")
 
 
-# class DiscordMarkdown:
-#
-#     codeblock_pattern = "```(?:([a-zA-Z0-9-]+?)\n+)?\n*([^`]+?)\n*```"  # Group 1 is Code Language (May be None), Group 2 is the content of the block
-#     blockQuote_pattern = None
-#     strikethrough = ""
-#
-#     # markdown.defaultRules.autolink
-
-
 class DiscordMarkdown:
 
-    codeblock_pattern = "```(?:([a-zA-Z0-9-]+?)\n+)?\n*([^`]+?)\n*```"  # Multiline. Group 1 is Code Language (May be None), Group 2 is the content of the block
-    blockQuote_pattern = None
-    # strikethrough = "~~([\S\s]+?)~~(?!_)"
-    # strikethrough_pattern = "~~([\S\s]+?)~~(?!_)"  # Singleline. G1 is content.
-    strikethrough_pattern = "(~~)(.+?)(~~)(?!_)"  # Singleline. G2 is content.
-    spoiler_pattern = "(\|\|)(.+?)(\|\|)"  # Singleline. G2 is content.
-    bold_pattern = "(\*\*)(.+?)(\*\*)"  # Singleline. G2 is content.
-    underline_pattern = "(__)(.+?)(__)"  # Singleline. G2 is content.
-    italics_pattern1 = "(\*)(.+?)(\*)"  # Singleline. G2 is content.
-    italics_pattern2 = "(_)(.+?)(_)"  # Singleline. G2 is content.  # TODO: impleement no whitespace
+    # escape_pattern = re.compile(r"\\([^0-9A-Za-z\s])")
+    # codeblock_pattern = re.compile(r"(?P<stag>```)(?:(?P<lang>[a-zA-Z0-9-]+?)\n+)?\n*(?P<content>[^`]+?)\n*(?P<etag>```)")  # Multiline. Group 1 is Code Language (May be None), Group 2 is the content of the block
+    codeblock_pattern = re.compile(r"(?P<stag>```)(?:(?P<lang>[a-zA-Z0-9-]+?)\n+)?\n*(?P<content>[\s\S]+?)\n*(?P<etag>```)")  # Multiline. Group 1 is Code Language (May be None), Group 2 is the content of the block
+    # inlinecodeblock_pattern: Pattern = re.compile(r"(?P<stag>`)(?P<content>.+?)(?P<etag>`)")
+    # inlinecodeblock_pattern = re.compile(r"^[^`\/]*?(`)([^`]*?[^`])(\1)(?!`)", flags=re.MULTILINE)
+    inlinecodeblock_pattern = re.compile(r"(`)(?P<content>[^`]*?[^`])(\1)(?!`)")
+    strikethrough_pattern = re.compile(r"~~(?P<content>.+?)~~(?!_)")  # Singleline. G2 is content.
+    spoiler_pattern = re.compile(r"\|\|(?P<content>.+?)\|\|")  # Singleline. G2 is content.
+    bold_pattern = re.compile(r"\*\*(?P<content>.+?)\*\*")  # Singleline. G2 is content.
+    underline_pattern = re.compile(r"__(?P<content>.+?)__")  # Singleline. G2 is content.
+    italics_pattern1 = re.compile(r"\*(?P<content>.+?)\*")  # Singleline. G2 is content.
+    italics_pattern2 = re.compile(r"_(?P<content>.+?)_")  # Singleline. G2 is content.
+    blockQuote_pattern = re.compile(r"^(?: *>>> ([\s\S]*))|^(?: *> ([^\n]*\n*))", flags=re.MULTILINE)  # (r"(?: *>>> ([\s\S]*))|(?: *> ([^\n]*))") # (?: *>>> ([\s\S]*))|
+
+
+    # @classmethod
+    # def replace(cls, _input: str, replacement: str, start: int, end: int):
+    #     out = f"{_input[:start]}{replacement}{_input[end:]}"
+    #     return out
+    #
+    # @classmethod
+    # def replace_all(cls, _input: str, start_tag: str, end_tag: str, start_group: int, end_group: int, pattern: str) -> str:
+    #     output = input
+    #     while True:
+    #         match = re.search(pattern, output)
+    #         if match is None:
+    #             break
+    #         output = cls.replace(output, end_tag, match.start(end_group), match.end(end_group))
+    #         output = cls.replace(output, start_tag, match.start(start_group), match.end(start_group))
+    #
+    #     return output
+
+    @classmethod
+    def codeblock_repl(cls, m: Match):
+        e_tag = "</div>"
+
+        if m.group("lang") is not None:
+            s_tag = f'<div class="pre pre--multiline language-{m.group("lang")}">'
+        else:
+            s_tag = '<div class="pre pre--multiline nohighlight">'
+
+        # Clean up the content
+        content = m.group('content')  # Markup(match.group('content')).striptags()
+        replacement = f"{s_tag}{content}{e_tag}"
+        return replacement
 
 
     @classmethod
-    def replace(cls, input: str, replacement: str, start: int, end: int):
-        out = f"{input[:start]}{replacement}{input[end:]}"
-        return out
+    def codeblock(cls, _input: str) -> Tuple[str, int]:
 
-    @classmethod
-    def replace_all(cls, input: str, start_tag: str, end_tag: str, start_group: int, end_group: int, pattern: str) -> str:
-        output = input
-        while True:
-            match = re.search(pattern, output)
-            if match is None:
-                break
-            output = cls.replace(output, end_tag, match.start(end_group), match.end(end_group))
-            output = cls.replace(output, start_tag, match.start(start_group), match.end(start_group))
-
+        output = cls.codeblock_pattern.subn(cls.codeblock_repl, _input)
         return output
 
 
     @classmethod
-    def spoiler(cls, input: str) -> str:
-        # group 1, group 3
-        first_tag = '<span class="spoiler">'
-        end_tag = "</span>"
-        output = cls.replace_all(input, first_tag, end_tag, 1, 3, cls.spoiler_pattern)
+    def inline_codeblock_repl(cls, m: Match):
+        s_tag = '<span class="pre pre--inline">'
+        e_tag = '</span>'
+
+        # Clean up the content
+        content = m.group('content')  # Markup(match.group('content')).striptags()
+        replacement = f"{s_tag}{content}{e_tag}"
+        return replacement
+
+    @classmethod
+    def inline_codeblock(cls, _input: str) -> Tuple[str, int]:
+        output = cls.inlinecodeblock_pattern.subn(cls.inline_codeblock_repl, _input)
+        return output
+
+    # region foldpls
+
+    @classmethod
+    def spoiler(cls, _input: str) -> Tuple[str, int]:
+        s_tag = '<span class="spoiler">'
+        e_tag = "</span>"
+        repl = r"{}\g<content>{}".format(s_tag, e_tag)
+        output = cls.spoiler_pattern.subn(repl, _input)
         return output
 
 
     @classmethod
-    def bold(cls, input: str) -> str:
-        # group 1, group 3
+    def bold(cls, _input: str) -> Tuple[str, int]:
         first_tag = '<strong>'
         end_tag = "</strong>"
-        output = cls.replace_all(input, first_tag, end_tag, 1, 3, cls.bold_pattern)
+        repl = r"{}\g<content>{}".format(first_tag, end_tag)
+        output = cls.bold_pattern.subn(repl, _input)
         return output
 
 
     @classmethod
-    def underline(cls, input: str) -> str:
-        # group 1, group 3
+    def underline(cls, _input: str) -> Tuple[str, int]:
         first_tag = '<u>'
         end_tag = "</u>"
-        output = cls.replace_all(input, first_tag, end_tag, 1, 3, cls.underline_pattern)
+        repl = r"{}\g<content>{}".format(first_tag, end_tag)
+        output = cls.underline_pattern.subn(repl, _input)
         return output
 
 
     @classmethod
-    def italics(cls, input: str) -> str:
-        # group 1, group 3
+    def italics(cls, _input: str) -> Tuple[str, int]:
         first_tag = '<em>'
         end_tag = "</em>"
-        output = cls.replace_all(input, first_tag, end_tag, 1, 3, cls.italics_pattern1)
-        output = cls.replace_all(output, first_tag, end_tag, 1, 3, cls.italics_pattern2)
-        return output
+        repl = r"{}\g<content>{}".format(first_tag, end_tag)
+        output, count = cls.italics_pattern1.subn(repl, _input)
+        output, count2 = cls.italics_pattern2.subn(repl, output)
+
+        return output, count+count2
 
 
     @classmethod
-    def strikethrough(cls, input: str):
-        # group 1, group 3
+    def strikethrough(cls, _input: str) -> Tuple[str, int]:
         first_tag = "<s>"
         end_tag = "</s>"
-        # output = input
-        # # matches = []
-        # while True:
-        #     match = re.search(cls.strikethrough_pattern, output)
-        #     if match is None:
-        #         break
-        #     output = cls.replace(output, end_tag, match.start(3), match.end(3))
-        #     output = cls.replace(output, first_tag, match.start(1), match.end(1))
-        output = cls.replace_all(input, first_tag, end_tag, 1, 3, cls.strikethrough_pattern)
+        repl = r"{}\g<content>{}".format(first_tag, end_tag)
+        output = cls.strikethrough_pattern.subn(repl, _input)
+        return output
+    # endregion
+
+
+    @classmethod
+    def blockquote_repl(cls, m: Match):
+        s_tag = '<div class="quote">'
+        e_tag = "</div>"
+
+        if m.group(1) is not None:  # Triple
+            replacement = f"{s_tag}{m.group(1)}{e_tag}"
+            # log.info(f"Matched 3bq")
+            return replacement
+        elif m.group(2) is not None:  # Single
+            content = m.group(2).replace('\n', '')  # Get the content and strip the newline
+            replacement = f"{s_tag}{content}{e_tag}"
+            # log.info(f"Matched 1bq")
+            return replacement
+        else:
+            pass
+            # log.info(f"No bq match found. can we even get here?")
+
+
+    @classmethod
+    def blockquote(cls, _input: str) -> Tuple[str, int]:
+        output = cls.blockQuote_pattern.subn(cls.blockquote_repl, _input)
         return output
 
 
     @classmethod
-    def markdown(cls, input: str) -> str:
+    def markdown(cls, _input: str) -> str:
+        output = _input
+        # First ensure the input is "safe"
+        # output = escape(_input)
 
-        output = cls.spoiler(input)
-        output = cls.strikethrough(output)
-        output = cls.bold(output)
-        output = cls.underline(output)
-        output = cls.italics(output)
+        output, count = cls.blockquote(_input)
+        output, count = cls.spoiler(output)
+        output, count = cls.strikethrough(output)
+        output, count = cls.bold(output)
+        output, count = cls.underline(output)
+        output, count = cls.italics(output)
+        output, count = cls.codeblock(output)  # Codeblock MUST be before inline codeblocks
+        output, count = cls.inline_codeblock(output)  # inline Codeblock MUST last
+
         return output
 
 
@@ -178,14 +237,25 @@ class CompositeMessage:
         return self._guild
 
     @property
+    def raw_content(self) -> str:
+        """Returns the raw unmarkdowned conttent of the message (if any)"""
+        if self.db_msg is None and self.mem_msg is None:
+            return "Message was not in the cache"
+
+        output = self.mem_msg.content if self.mem_msg is not None else self.db_msg.content
+        return output
+
+
+    @property
     def content(self) -> str:
         """Returns the content of the message (if any)"""
         if self.db_msg is None and self.mem_msg is None:
             return "Message was not in the cache"
 
         output = self.mem_msg.content if self.mem_msg is not None else self.db_msg.content
-        safe_output = escape(output)
-        return Markup(markdown.markdown(safe_output))
+        markdowned = markdown.markdown(output)
+        # safe_output = escape(markdowned)
+        return Markup(markdowned)
 
     @property
     def created_at(self) -> Optional[datetime]:
@@ -399,10 +469,10 @@ class Archive(commands.Cog):
     @commands.cooldown(rate=1, per=10, type=commands.BucketType.guild)
     @commands.max_concurrency(1, per=commands.BucketType.guild, wait=False)
     @commands.is_owner()
-    @commands.command(name="txt_archive",
+    @commands.command(name="txtarc",
                       brief="Recod.",
                       description="adw")
-    async def txt_archive(self, ctx: commands.Context, number_of_msg: int):
+    async def txt_archive(self, ctx: commands.Context, number_of_msg: int = 1000):
         channel: discord.TextChannel = ctx.channel
 
         # Check for permissions
@@ -419,30 +489,37 @@ class Archive(commands.Cog):
         # Todo: Add archive specific cooldown error handling
         # Todo: Add archive specific max concurancy error handling
 
-        await ctx.send(
-            f"Beginning archive of the last {number_of_msg} messages. This may take a while for large numbers of messages.")
+        # Fixme: Uncomment
+        # await ctx.send(
+        #     f"Beginning archive of the last {number_of_msg} messages. This may take a while for large numbers of messages.")
 
         start_time = time.perf_counter()
         async with channel.typing():
             # Get the specified num of messages from this channel BEFORE the command was sent.
             messages = await channel.history(limit=number_of_msg, before=ctx.message, oldest_first=False).flatten()
 
+            # Fixme: Uncomment
             # alert user if channel has less messages than they asked for.
-            if len(messages) < number_of_msg:
-                number_of_msg = len(messages)
-                await ctx.send(f"#{channel.name} only contained {number_of_msg}. Archiving the entire channel.")
+            # if len(messages) < number_of_msg:
+            #     number_of_msg = len(messages)
+            #     await ctx.send(f"#{channel.name} only contained {number_of_msg}. Archiving the entire channel.")
 
             # Construct CompositeMessages with the history we just got and DB data.
             comp_messages: List[CompositeMessage] = []
             for msg in messages:
                 db_msg = await db.get_cached_message(self.bot.db_pool, ctx.guild.id, msg.id)
                 comp_messages.append(CompositeMessage(self.bot, msg.id, msg, db_msg))
+        #
+        # with chatArchiver.generate_txt_archive(comp_messages, ctx.channel.name) as archive_file:
+        #     file_name = f"{channel.name} - Archive.txt"
+        #     end_time = time.perf_counter()
+        #     await ctx.send(f"Archived {number_of_msg} messages in {(end_time - start_time):.2f} seconds.",
+        #                    file=discord.File(archive_file, filename=file_name))
 
-        with chatArchiver.generate_txt_archive(comp_messages, ctx.channel.name) as archive_file:
-            file_name = f"{channel.name} - Archive.txt"
+
+            chatArchiver.save_htmlDebug_txt_archive(comp_messages, ctx.channel.name)
             end_time = time.perf_counter()
-            await ctx.send(f"Archived {number_of_msg} messages in {(end_time - start_time):.2f} seconds.",
-                           file=discord.File(archive_file, filename=file_name))
+            log.info(f"Archived {number_of_msg} messages in {(end_time - start_time):.2f} seconds.")
 
 
     # ----- Commands ----- #
@@ -469,8 +546,9 @@ class Archive(commands.Cog):
 
         # Todo: Add archive specific max concurancy error handling
 
-        await ctx.send(
-            f"Beginning archive of the last {number_of_msg} messages.")
+        # Fixme: Uncomment
+        # await ctx.send(
+        #     f"Beginning archive of the last {number_of_msg} messages.")
 
         start_time = time.perf_counter()
         async with channel.typing():
@@ -484,26 +562,23 @@ class Archive(commands.Cog):
                 await ctx.send(f"#{channel.name} only contained {number_of_msg}. Archiving the entire channel.")
 
             # Construct CompositeMessages with the history we just got and DB data.
-            # comp_messages: List[CompositeMessage] = []
             message_groups: MessageGroups = MessageGroups()
             for msg in messages:
                 db_msg = await db.get_cached_message(self.bot.db_pool, ctx.guild.id, msg.id)
                 comp_msg = CompositeMessage(self.bot, msg.id, msg, db_msg)
                 message_groups.append(comp_msg)
-                # comp_messages.append(comp_msg)
 
+        # Fixme: Uncomment
         with chatArchiver.generate_html_archive(channel, message_groups, len(messages)) as archive_file:
             file_name = f"{channel.name} - Archive.html"
             end_time = time.perf_counter()
             await ctx.send(f"Archived {number_of_msg} messages in {(end_time - start_time):.2f} seconds.",
                            file=discord.File(archive_file, filename=file_name))
-        #
-        # with chatArchiver.generate_txt_archive(comp_messages, ctx.channel.name) as archive_file:
-        #     file_name = f"{channel.name} - Archive.txt"
-        #     end_time = time.perf_counter()
-        #     await ctx.send(f"Archived {number_of_msg} messages in {(end_time - start_time):.2f} seconds.",
-        #                    file=discord.File(archive_file, filename=file_name))
-        log.info(f"Archived {number_of_msg} messages for storage in {ctx.guild.id}.")
+
+        # For debugging.
+        # chatArchiver.save_html_archive(channel, message_groups, len(messages))
+        # end_time = time.perf_counter()
+        # log.info(f"Archived {number_of_msg} messages in {(end_time - start_time):.2f}s for storage in {ctx.guild.id}.")
 
 
 class BulkMsgDelete(commands.Cog):

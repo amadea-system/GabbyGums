@@ -1,6 +1,8 @@
 asyncpg
-discord.py>=1.2.5
+discord.py>=1.3
 psutil
 pillow
 fuzzywuzzy[speedup]
 jinja2
+regex
+
