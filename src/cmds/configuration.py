@@ -120,8 +120,7 @@ class Configuration(commands.Cog):
     @commands.guild_only()
     @commands.command(name="events", aliases=['event', 'configure_events', "setup_events", "config_event"],
                       brief="Allows for setting per event log channels and/or disabling specific events from being logged.",
-                      description="Allows for setting per event log channels and/or disabling specific events from being logged.",
-                      usage='<command> [channel]')
+                      description="Allows for setting per event log channels and/or disabling specific events from being logged.")
     async def configure_event(self, ctx: commands.Context):
         await self.config_event_menu(ctx)
 
