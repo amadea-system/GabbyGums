@@ -8,6 +8,7 @@ Logs from these event include:
 Part of the Gabby Gums Discord Logger.
 """
 
+# import asyncio
 import string
 import logging
 from datetime import datetime
@@ -43,7 +44,7 @@ class ChannelEvents(commands.Cog):
                 return True
 
         if isinstance(channel, discord.CategoryChannel):
-            if await self.bot.is_category_ignored(channel.guild.id, channel.category):
+            if await self.bot.is_category_ignored(channel.guild.id, channel):
                 return True
 
         return False
@@ -58,44 +59,77 @@ class ChannelEvents(commands.Cog):
             category = channel if isinstance(channel, discord.CategoryChannel) else channel.category
             ignored = await self.check_if_ignored(category)  # Only check Category ,Channel is new so it can't be ignored.
             if not ignored:
-                embed = self.get_channel_create_embed(channel)
+                embed = await self.get_channel_create_embed(channel)
                 await log_ch.send(embed=embed)
 
 
-    @classmethod
-    def get_channel_create_embed(cls, channel: GuildChannel) -> discord.Embed:
+    async def get_channel_create_embed(self, channel: GuildChannel) -> discord.Embed:
         """Constructs the embed for the 'on_guild_channel_create' event."""
         _type = description = field_value = None  # Keep MyPy happy
         if isinstance(channel, discord.TextChannel):
-            log.info(f"New Text channel created! {channel.name} in {channel.category}, Pos: {channel.position}")
+            # log.info(f"New Text channel created! {channel.name} in {channel.category}, Pos: {channel.position}")
             _type = "Text Channel"
             if channel.category is not None:
                 description = f"A new text channel was created in {channel.category}."
             else:
                 description = f"A new text channel was created."
-            field_value = f"<#{channel.id}>\n(#{channel.name})"
+
         if isinstance(channel, discord.VoiceChannel):
-            log.info(f"New Voice channel created! {channel.name} in {channel.category}, Pos: {channel.position}")
+            # log.info(f"New Voice channel created! {channel.name} in {channel.category}, Pos: {channel.position}")
             _type = "Voice Channel"
             if channel.category is not None:
                 description = f"A new voice channel was created in {channel.category}."
             else:
                 description = f"A new voice channel was created."
-            field_value = f"#{channel.name}\n(ID: {channel.id})"
+
         if isinstance(channel, discord.CategoryChannel):
-            log.info(f"New Category created! {channel.name}, Pos: {channel.position}")
+            # log.info(f"New Category created! {channel.name}, Pos: {channel.position}")
             _type = "Category"
             description = f"A new category was created."
-            field_value = f"#{channel.name}\n(ID: {channel.id})"
 
         embed = discord.Embed(title=f"{_type} Created",
                               description=description,
                               timestamp=datetime.utcnow(), color=discord.Color.blue())
 
-        # embed.set_footer(text="\N{ZERO WIDTH SPACE}")
         embed.set_footer(text=f"Channel ID: {channel.id}")
-        embed.add_field(name=f"New {_type}:", value=field_value)
+        embed.add_field(name=f"New {_type}:", value=f"<#{channel.id}>  -  #{channel.name}", inline=False)
+        if channel.category is not None:
+            embed.add_field(name="In Category:", value=channel.category, inline=False)
+        # embed.add_field(name="Location:", value= , inline=False)  #await self.find_nearby_channel(channel)
         return embed
+
+    # async def find_nearby_channel(self, channel: GuildChannel):
+    #     await asyncio.sleep(1)
+    #     guild: discord.Guild = channel.guild
+    #     if isinstance(channel, discord.TextChannel):
+    #         if channel.position == 0:
+    #             return "Top Most Text Channel"
+    #         else:
+    #             channels = guild.text_channels
+    #             log.info(f"Channels: {channels}")
+    #             log.info(f"New ch pos: {channel.position}")
+    #             log.info(f"Channels len: {len(channels)}")
+    #             index = channel.position - 1
+    #             log.info(f"index: {index}")
+    #             below_ch = channels[index]
+    #             log.info(f"Below ch pos: {below_ch.position}")
+    #
+    #             below_ch = guild.text_channels[channel.position-1]
+    #             return f"Below <#{below_ch.id}>"
+    #
+    #     if isinstance(channel, discord.VoiceChannel):
+    #         if channel.position == 0:
+    #             return "Top Most Voice Channel"
+    #         else:
+    #             below_ch = guild.voice_channels[channel.position-1]
+    #             return f"Below: <#{below_ch.id}>"
+    #
+    #     if isinstance(channel, discord.CategoryChannel):
+    #         if channel.position == 0:
+    #             return "Top Most Category"
+    #         else:
+    #             below_ch = guild.categories[channel.position-1]
+    #             return f"Below: {below_ch.name}"
 
 
     @commands.Cog.listener()
@@ -107,41 +141,75 @@ class ChannelEvents(commands.Cog):
         if log_ch is not None:
             ignored = await self.check_if_ignored(channel)
             if not ignored:
-                embed = self.get_channel_delete_embed(channel)
+                embed = await self.get_channel_delete_embed(channel)
                 await log_ch.send(embed=embed)
 
 
     @classmethod
-    def get_channel_delete_embed(cls, channel: GuildChannel) -> discord.Embed:
+    async def get_channel_delete_embed(cls, channel: GuildChannel) -> discord.Embed:
         """Constructs the embed for the 'on_guild_channel_delete' event."""
 
         _type = description = None  # Keep MyPy happy
         if isinstance(channel, discord.TextChannel):
-            log.info(f"Text channel deleted! {channel.name} in {channel.category}, Pos: {channel.position}")
+            # log.info(f"Text channel deleted! {channel.name} in {channel.category}, Pos: {channel.position}")
             _type = "Text Channel"
             if channel.category is not None:
                 description = f"A text channel was deleted from {channel.category}."
             else:
                 description = f"A text channel was deleted."
         if isinstance(channel, discord.VoiceChannel):
-            log.info(f"Voice channel deleted! {channel.name} in {channel.category}, Pos: {channel.position}")
+            # log.info(f"Voice channel deleted! {channel.name} in {channel.category}, Pos: {channel.position}")
             _type = "Voice Channel"
             if channel.category is not None:
                 description = f"A voice channel was deleted from {channel.category}."
             else:
                 description = f"A voice channel was deleted."
         if isinstance(channel, discord.CategoryChannel):
-            log.info(f"Category deleted! {channel.name}, Pos: {channel.position}")
+            # log.info(f"Category deleted! {channel.name}, Pos: {channel.position}")
             _type = "Category"
             description = f"A category was deleted."
 
         embed = discord.Embed(title=f"{_type} Deleted",
                               description=description,
                               timestamp=datetime.utcnow(), color=discord.Color.dark_blue())
-        # embed.set_footer(text="\N{ZERO WIDTH SPACE}")
+
         embed.set_footer(text=f"Channel ID: {channel.id}")
-        embed.add_field(name=f"Deleted {_type}", value=f"#{channel.name}\n(ID: {channel.id})")
+        embed.add_field(name=f"Deleted {_type}", value=f"#{channel.name}  -  ID: {channel.id}", inline=False)
+
+        if channel.category is not None:
+            embed.add_field(name="From Category:", value=channel.category, inline=False)
+        # embed.add_field(name="Former Location:", value=await cls.find_former_channel_location(channel), inline=False)
         return embed
+
+
+    # @staticmethod
+    # async def find_former_channel_location(channel: GuildChannel):
+    #     guild: discord.Guild = channel.guild
+    #     if isinstance(channel, discord.TextChannel):
+    #         if channel.position == 0:
+    #             return "Top Most Text Channel"
+    #         else:
+    #             channels = guild.text_channels
+    #             log.info(f"Channels: {channels}")
+    #             log.info(f"Deleted ch pos: {channel.position}")
+    #
+    #             below_ch = channels[channel.position]
+    #             log.info(f"Below ch pos: {below_ch.position}")
+    #             return f"Below <#{below_ch.id}>"
+    #
+    #     if isinstance(channel, discord.VoiceChannel):
+    #         if channel.position == 0:
+    #             return "Top Most Voice Channel"
+    #         else:
+    #             below_ch = guild.voice_channels[channel.position]
+    #             return f"Below: <#{below_ch.id}>"
+    #
+    #     if isinstance(channel, discord.CategoryChannel):
+    #         if channel.position == 0:
+    #             return "Top Most Category"
+    #         else:
+    #             below_ch = guild.categories[channel.position]
+    #             return f"Below: {below_ch.name}"
 
 
     @commands.Cog.listener()
@@ -177,7 +245,7 @@ class ChannelEvents(commands.Cog):
     @classmethod
     def get_text_ch_update_embed(cls, before: discord.TextChannel, after: discord.TextChannel) -> Optional[discord.Embed]:
         """Constructs the embed for the 'on_guild_channel_update' event for text channels."""
-        log.info(f"Text channel Updated! {after.name} in {after.category}, Pos: {after.position}")
+        # log.info(f"Text channel Updated! {after.name} in {after.category}, Pos: {after.position}")
         embed = discord.Embed(title="Text Channel Updated",
                               description=f"Update info for: <#{after.id}>",
                               timestamp=datetime.utcnow(), color=discord.Color.blurple())
@@ -255,7 +323,7 @@ class ChannelEvents(commands.Cog):
     def get_category_ch_update_embed(cls, before: discord.CategoryChannel, after: discord.CategoryChannel) -> Optional[discord.Embed]:
         """Constructs the embed for the 'on_guild_channel_update' event for categories."""
         embed = discord.Embed(title="Category Updated",
-                              description=f"Update info for: <#{after.id}>",
+                              description=f"Update info for category <#{after.id}>",
                               timestamp=datetime.utcnow(), color=discord.Color.blurple())
 
         embed.set_footer(text=f"Category ID: {after.id}")
@@ -286,7 +354,7 @@ class ChannelEvents(commands.Cog):
             if before_overwrites != after_overwrites:  # If they have changed
 
                 _type = f"Role" if isinstance(key, discord.Role) else f"Member"  # Record if it's a role or member having the permissions changed.
-                header = f"{_type} Permission Overwrites for {key.name}:\n"  # Write out the appropriate embed header.
+                header = f"{_type} Permission Overwrites for @{key.name}:\n"  # Write out the appropriate embed header.
                 if after_overwrites is not None:
                     after_set = set(after_overwrites)
                     before_set = set(before_overwrites)
@@ -315,7 +383,6 @@ class ChannelEvents(commands.Cog):
                 change_msgs.append((header, body))
 
         if len(change_msgs) > 0:
-            # embed.add_field(name="__Channel Permission Overrides Changed:__", value=f"\N{zero width space}", inline=False)
             for change in change_msgs:
                 embed.add_field(name=change[0], value=change[1], inline=False)
         return embed
