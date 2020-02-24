@@ -1,7 +1,9 @@
 """
-Cog for the on_guild_channel_create, on_guild_channel_delete, and on_guild_channel_updateevent.
+Cog for the on_guild_channel_create, on_guild_channel_delete, and on_guild_channel_update events.
 Logs from these event include:
-    Nickname changes in a guild (guild_member_nickname)
+    When a new channel is created in a guild (on_guild_channel_create)
+    When a channel is deleted from a guild (on_guild_channel_delete)
+    When a channel in a guild is modified. Name, permissions, etc. (on_guild_channel_update)
 
 Part of the Gabby Gums Discord Logger.
 """
@@ -9,7 +11,7 @@ Part of the Gabby Gums Discord Logger.
 import string
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional, Dict, List, Union, Tuple, NamedTuple
+from typing import TYPE_CHECKING, Union, Optional  # , Dict, List, Tuple, NamedTuple
 
 import discord
 from discord.ext import commands
@@ -23,25 +25,46 @@ log = logging.getLogger(__name__)
 now_txt = "Now:\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{PUNCTUATION SPACE}\N{HAIR SPACE}"
 before_txt = "Before:\N{NO-BREAK SPACE}\N{SIX-PER-EM SPACE}"
 
+# Type aliases
+GuildChannel = Union[discord.TextChannel, discord.VoiceChannel, discord.CategoryChannel]
+
 
 class ChannelEvents(commands.Cog):
     def __init__(self, bot: 'GGBot'):
         self.bot = bot
 
+    async def check_if_ignored(self, channel: GuildChannel) -> bool:
+        """Checks to see if the channel and/or category is ignored. Returns True if it is."""
+        if isinstance(channel, discord.TextChannel) or isinstance(channel, discord.VoiceChannel):
+            if await self.bot.is_channel_ignored(channel.guild.id, channel.id):
+                return True
+
+            if await self.bot.is_category_ignored(channel.guild.id, channel.category):
+                return True
+
+        if isinstance(channel, discord.CategoryChannel):
+            if await self.bot.is_category_ignored(channel.guild.id, channel.category):
+                return True
+
+        return False
 
     @commands.Cog.listener()
-    async def on_guild_channel_create(self, channel: discord.abc.GuildChannel):
-        """Handles the 'on on_guild_channel_create' event."""
+    async def on_guild_channel_create(self, channel: GuildChannel):
+        """Handles the 'on_guild_channel_create' event."""
         event_type = "channel_create"
+
         log_ch = await self.bot.get_event_or_guild_logging_channel(channel.guild.id, event_type)
         if log_ch is not None:
+            category = channel if isinstance(channel, discord.CategoryChannel) else channel.category
+            ignored = await self.check_if_ignored(category)  # Only check Category ,Channel is new so it can't be ignored.
+            if not ignored:
+                embed = self.get_channel_create_embed(channel)
+                await log_ch.send(embed=embed)
 
-            embed = self.get_channel_create_embed(channel)
-            await log_ch.send(embed=embed)
 
-
-    def get_channel_create_embed(self, channel: discord.abc.GuildChannel) -> discord.Embed:
-
+    @classmethod
+    def get_channel_create_embed(cls, channel: GuildChannel) -> discord.Embed:
+        """Constructs the embed for the 'on_guild_channel_create' event."""
         _type = description = field_value = None  # Keep MyPy happy
         if isinstance(channel, discord.TextChannel):
             log.info(f"New Text channel created! {channel.name} in {channel.category}, Pos: {channel.position}")
@@ -51,7 +74,7 @@ class ChannelEvents(commands.Cog):
             else:
                 description = f"A new text channel was created."
             field_value = f"<#{channel.id}>\n(#{channel.name})"
-        elif isinstance(channel, discord.VoiceChannel):
+        if isinstance(channel, discord.VoiceChannel):
             log.info(f"New Voice channel created! {channel.name} in {channel.category}, Pos: {channel.position}")
             _type = "Voice Channel"
             if channel.category is not None:
@@ -69,25 +92,28 @@ class ChannelEvents(commands.Cog):
                               description=description,
                               timestamp=datetime.utcnow(), color=discord.Color.blue())
 
-        embed.set_footer(text="\N{ZERO WIDTH SPACE}")
+        # embed.set_footer(text="\N{ZERO WIDTH SPACE}")
+        embed.set_footer(text=f"Channel ID: {channel.id}")
         embed.add_field(name=f"New {_type}:", value=field_value)
         return embed
 
 
     @commands.Cog.listener()
-    async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel, ):
-        """Handles the 'on on_guild_channel_delete' event."""
+    async def on_guild_channel_delete(self, channel: GuildChannel):
+        """Handles the 'on_guild_channel_delete' event."""
         event_type = "channel_delete"
-
-        log.info(f"{event_type} fired!")
 
         log_ch = await self.bot.get_event_or_guild_logging_channel(channel.guild.id, event_type)
         if log_ch is not None:
-            embed = self.get_channel_delete_embed(channel)
-            await log_ch.send(embed=embed)
+            ignored = await self.check_if_ignored(channel)
+            if not ignored:
+                embed = self.get_channel_delete_embed(channel)
+                await log_ch.send(embed=embed)
 
 
-    def get_channel_delete_embed(self, channel: discord.abc.GuildChannel) -> discord.Embed:
+    @classmethod
+    def get_channel_delete_embed(cls, channel: GuildChannel) -> discord.Embed:
+        """Constructs the embed for the 'on_guild_channel_delete' event."""
 
         _type = description = None  # Keep MyPy happy
         if isinstance(channel, discord.TextChannel):
@@ -97,7 +123,7 @@ class ChannelEvents(commands.Cog):
                 description = f"A text channel was deleted from {channel.category}."
             else:
                 description = f"A text channel was deleted."
-        elif isinstance(channel, discord.VoiceChannel):
+        if isinstance(channel, discord.VoiceChannel):
             log.info(f"Voice channel deleted! {channel.name} in {channel.category}, Pos: {channel.position}")
             _type = "Voice Channel"
             if channel.category is not None:
@@ -112,47 +138,51 @@ class ChannelEvents(commands.Cog):
         embed = discord.Embed(title=f"{_type} Deleted",
                               description=description,
                               timestamp=datetime.utcnow(), color=discord.Color.dark_blue())
-        embed.set_footer(text="\N{ZERO WIDTH SPACE}")
-
+        # embed.set_footer(text="\N{ZERO WIDTH SPACE}")
+        embed.set_footer(text=f"Channel ID: {channel.id}")
         embed.add_field(name=f"Deleted {_type}", value=f"#{channel.name}\n(ID: {channel.id})")
         return embed
 
 
     @commands.Cog.listener()
-    async def on_guild_channel_update(self, before: discord.abc.GuildChannel, after: discord.abc.GuildChannel):
-        """Handles the 'on on_guild_channel_update' event."""
+    async def on_guild_channel_update(self, before: GuildChannel, after: GuildChannel):
+        """Handles the 'on_guild_channel_update' event."""
         event_type = "channel_update"
 
         # log.info(f"{event_type} fired!")
         if before.position == after.position:  # Filter out position change spam
+
+            # noinspection PyUnresolvedReferences
             log_ch = await self.bot.get_event_or_guild_logging_channel(before.guild.id, event_type)
 
             if log_ch is not None:
-                if isinstance(before, discord.TextChannel) and isinstance(after, discord.TextChannel):
-                    embed = self.get_text_ch_update_embed(before, after)
-                    if embed is not None:
-                        await log_ch.send(embed=embed)
+                ignored = await self.check_if_ignored(after)
+                if not ignored:
+                    if isinstance(before, discord.TextChannel) and isinstance(after, discord.TextChannel):
+                        embed = self.get_text_ch_update_embed(before, after)
+                        if embed is not None:
+                            await log_ch.send(embed=embed)
 
-                elif isinstance(before, discord.VoiceChannel) and isinstance(after, discord.VoiceChannel):
-                    embed = self.get_voice_ch_update_embed(before, after)
-                    if embed is not None:
-                        await log_ch.send(embed=embed)
+                    if isinstance(before, discord.VoiceChannel) and isinstance(after, discord.VoiceChannel):
+                        embed = self.get_voice_ch_update_embed(before, after)
+                        if embed is not None:
+                            await log_ch.send(embed=embed)
 
-                if isinstance(before, discord.CategoryChannel) and isinstance(after, discord.CategoryChannel):
-                    embed = self.get_categoty_ch_update_embed(before, after)
-                    if embed is not None:
-                        await log_ch.send(embed=embed)
+                    if isinstance(before, discord.CategoryChannel) and isinstance(after, discord.CategoryChannel):
+                        embed = self.get_category_ch_update_embed(before, after)
+                        if embed is not None:
+                            await log_ch.send(embed=embed)
 
 
-    def get_text_ch_update_embed(self, before: discord.TextChannel, after: discord.TextChannel):
+    @classmethod
+    def get_text_ch_update_embed(cls, before: discord.TextChannel, after: discord.TextChannel) -> Optional[discord.Embed]:
+        """Constructs the embed for the 'on_guild_channel_update' event for text channels."""
         log.info(f"Text channel Updated! {after.name} in {after.category}, Pos: {after.position}")
         embed = discord.Embed(title="Text Channel Updated",
                               description=f"Update info for: <#{after.id}>",
                               timestamp=datetime.utcnow(), color=discord.Color.blurple())
 
         embed.set_footer(text=f"Channel ID: {after.id}")
-        # now = "Now: \N{zero width space} \N{zero width space}  \N{zero width space} "
-        # bef = "Before: "
 
         if before.name != after.name:
             embed.add_field(name="Name Changed:",
@@ -163,36 +193,36 @@ class ChannelEvents(commands.Cog):
                             value=f"{now_txt}**{after.category}**\n{before_txt}**{before.category}**")
 
         if before.topic != after.topic:
-            if before.topic is None and after.topic == "":
-                pass
-                # log.info("Avoided "" None topic bug.")
-            else:
-                embed.add_field(name="Topic Changed:", value=f"{now_txt}**{after.topic}**\n{before_txt}**{before.topic}**")
+            if not (before.topic is None and after.topic == ""):
+                embed.add_field(name="Topic Changed:",
+                                value=f"{now_txt}**{after.topic}**\n{before_txt}**{before.topic}**")
 
         if before.slowmode_delay != after.slowmode_delay:
             before_delay = f"{before.slowmode_delay} Sec" if before.slowmode_delay > 0 else "Disabled"
             after_delay = f"{after.slowmode_delay} Sec" if after.slowmode_delay > 0 else "Disabled"
-            embed.add_field(name="Slowmode Delay Changed:", value=f"{now_txt}**{after_delay}**\n{before_txt}**{before_delay}**")
+
+            embed.add_field(name="Slowmode Delay Changed:",
+                            value=f"{now_txt}**{after_delay}**\n{before_txt}**{before_delay}**")
 
         if before.is_nsfw() != after.is_nsfw():
             before_nsfw = "Yes" if before.is_nsfw() else "No"
             after_nsfw = "Yes" if after.is_nsfw() else "No"
-            embed.add_field(name="NSFW Status Changed:", value=f"{now_txt}**{after_nsfw}**\n{before_txt}**{before_nsfw}**")
+
+            embed.add_field(name="NSFW Status Changed:",
+                            value=f"{now_txt}**{after_nsfw}**\n{before_txt}**{before_nsfw}**")
 
         # if before.changed_roles != after.changed_roles:
         #     embed.add_field(name="changed_roles Changed:", value=f"{now_txt}{after.changed_roles}\n{before_txt}{before.changed_roles}")
-        #
+
         if before.overwrites != after.overwrites:
-            embed = self.determine_changed_overrides(embed, before, after)
-
-            # embed.add_field(name="overwrites Changed:", value=f"{now_txt}{after.overwrites}\n{before_txt}{before.overwrites}")
-
+            embed = cls.determine_changed_overrides(embed, before, after)
 
         return embed if len(embed.fields) > 0 else None
 
 
-    def get_voice_ch_update_embed(self, before: discord.VoiceChannel, after: discord.VoiceChannel):
-        log.info(f"Voice channel Updated! {after.name} in {after.category}, Pos: {after.position}")
+    @classmethod
+    def get_voice_ch_update_embed(cls, before: discord.VoiceChannel, after: discord.VoiceChannel) -> Optional[discord.Embed]:
+        """Constructs the embed for the 'on_guild_channel_update' event for voice channels."""
         embed = discord.Embed(title="Voice Channel Updated",
                               description=f"Update info for: <#{after.id}>",
                               timestamp=datetime.utcnow(), color=discord.Color.blurple())
@@ -208,19 +238,22 @@ class ChannelEvents(commands.Cog):
                             value=f"{now_txt}**{after.category}**\n{before_txt}**{before.category}**")
 
         if before.bitrate != after.bitrate:
-            embed.add_field(name="Audio Bitrate Changed:", value=f"{now_txt}**{after.bitrate//1000} kbps**\n{before_txt}**{before.bitrate//1000} kbps**")
+            embed.add_field(name="Audio Bitrate Changed:",
+                            value=f"{now_txt}**{after.bitrate // 1000} kbps**\n{before_txt}**{before.bitrate // 1000} kbps**")
 
         if before.user_limit != after.user_limit:
-            embed.add_field(name="User Limit Changed:", value=f"{now_txt}**{after.user_limit}**\n{before_txt}**{before.user_limit}**")
+            embed.add_field(name="User Limit Changed:",
+                            value=f"{now_txt}**{after.user_limit}**\n{before_txt}**{before.user_limit}**")
 
         if before.overwrites != after.overwrites:
-            embed = self.determine_changed_overrides(embed, before, after)
+            embed = cls.determine_changed_overrides(embed, before, after)
 
         return embed if len(embed.fields) > 0 else None
 
 
-    def get_categoty_ch_update_embed(self, before: discord.CategoryChannel, after: discord.CategoryChannel):
-        log.info(f"Category Updated! {after.name}, Pos: {after.position}")
+    @classmethod
+    def get_category_ch_update_embed(cls, before: discord.CategoryChannel, after: discord.CategoryChannel) -> Optional[discord.Embed]:
+        """Constructs the embed for the 'on_guild_channel_update' event for categories."""
         embed = discord.Embed(title="Category Updated",
                               description=f"Update info for: <#{after.id}>",
                               timestamp=datetime.utcnow(), color=discord.Color.blurple())
@@ -234,20 +267,24 @@ class ChannelEvents(commands.Cog):
         if before.is_nsfw() != after.is_nsfw():
             before_nsfw = "Yes" if before.is_nsfw() else "No"
             after_nsfw = "Yes" if after.is_nsfw() else "No"
-            embed.add_field(name="NSFW Status Changed:", value=f"{now_txt}**{after_nsfw}**\n{before_txt}**{before_nsfw}**")
+            embed.add_field(name="NSFW Status Changed:",
+                            value=f"{now_txt}**{after_nsfw}**\n{before_txt}**{before_nsfw}**")
 
         if before.overwrites != after.overwrites:
-            embed = self.determine_changed_overrides(embed, before, after)
+            embed = cls.determine_changed_overrides(embed, before, after)
 
         return embed if len(embed.fields) > 0 else None
 
 
-    def determine_changed_overrides(self, embed, before, after):
+    @classmethod
+    def determine_changed_overrides(cls, embed: discord.Embed, before: GuildChannel, after: GuildChannel) -> discord.Embed:
+        """Determines which overwrites (if any) have changed, and adds fields to an embed as necessary to reflect those changes."""
         change_msgs = []
         for key, before_overwrites in before.overwrites.items():  # Iterate through the before overwrites
-            after_overwrites = after.overwrites[key] if key in after.overwrites else None  # Get the corresponding new overwrite.
+            after_overwrites = after.overwrites[
+                key] if key in after.overwrites else None  # Get the corresponding new overwrite.
             if before_overwrites != after_overwrites:  # If they have changed
-                log.info(f"{key.name}: are NOT equal")
+
                 _type = f"Role" if isinstance(key, discord.Role) else f"Member"  # Record if it's a role or member having the permissions changed.
                 header = f"{_type} Permission Overwrites for {key.name}:\n"  # Write out the appropriate embed header.
                 if after_overwrites is not None:
@@ -276,16 +313,12 @@ class ChannelEvents(commands.Cog):
                     body = f"Permission Overwrites Removed"
 
                 change_msgs.append((header, body))
-                logging.warning(header + body)
-
 
         if len(change_msgs) > 0:
-            # embed.add_field(name="__Channel Permission Overrides Changed:__", value=f"\N{zero width space}",
-            #                 inline=False)
+            # embed.add_field(name="__Channel Permission Overrides Changed:__", value=f"\N{zero width space}", inline=False)
             for change in change_msgs:
                 embed.add_field(name=change[0], value=change[1], inline=False)
         return embed
-
 
 
 def setup(bot):
