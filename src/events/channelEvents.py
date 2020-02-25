@@ -254,30 +254,30 @@ class ChannelEvents(commands.Cog):
 
         if before.name != after.name:
             embed.add_field(name="Name Changed:",
-                            value=f"{now_txt}**{after.name}**\n{before_txt}**{before.name}**")
+                            value=f"{before_txt}**{before.name}\n{now_txt}**{after.name}****")
 
         if before.category != after.category:
             embed.add_field(name="Category Changed",
-                            value=f"{now_txt}**{after.category}**\n{before_txt}**{before.category}**")
+                            value=f"{before_txt}**{before.category}**\n{now_txt}**{after.category}**")
 
         if before.topic != after.topic:
             if not (before.topic is None and after.topic == ""):
                 embed.add_field(name="Topic Changed:",
-                                value=f"{now_txt}**{after.topic}**\n{before_txt}**{before.topic}**")
+                                value=f"{before_txt}**{before.topic}**\n{now_txt}**{after.topic}**")
 
         if before.slowmode_delay != after.slowmode_delay:
             before_delay = f"{before.slowmode_delay} Sec" if before.slowmode_delay > 0 else "Disabled"
             after_delay = f"{after.slowmode_delay} Sec" if after.slowmode_delay > 0 else "Disabled"
 
             embed.add_field(name="Slowmode Delay Changed:",
-                            value=f"{now_txt}**{after_delay}**\n{before_txt}**{before_delay}**")
+                            value=f"{before_txt}**{before_delay}**\n{now_txt}**{after_delay}**")
 
         if before.is_nsfw() != after.is_nsfw():
             before_nsfw = "Yes" if before.is_nsfw() else "No"
             after_nsfw = "Yes" if after.is_nsfw() else "No"
 
             embed.add_field(name="NSFW Status Changed:",
-                            value=f"{now_txt}**{after_nsfw}**\n{before_txt}**{before_nsfw}**")
+                            value=f"{before_txt}**{before_nsfw}**\n{now_txt}**{after_nsfw}**")
 
         # if before.changed_roles != after.changed_roles:
         #     embed.add_field(name="changed_roles Changed:", value=f"{now_txt}{after.changed_roles}\n{before_txt}{before.changed_roles}")
@@ -299,19 +299,19 @@ class ChannelEvents(commands.Cog):
 
         if before.name != after.name:
             embed.add_field(name="Name Changed:",
-                            value=f"{now_txt}**{after.name}**\n{before_txt}**{before.name}**")
+                            value=f"{before_txt}**{before.name}**\n{now_txt}**{after.name}**")
 
         if before.category != after.category:
             embed.add_field(name="Category Changed",
-                            value=f"{now_txt}**{after.category}**\n{before_txt}**{before.category}**")
+                            value=f"{before_txt}**{before.category}**\n{now_txt}**{after.category}**")
 
         if before.bitrate != after.bitrate:
             embed.add_field(name="Audio Bitrate Changed:",
-                            value=f"{now_txt}**{after.bitrate // 1000} kbps**\n{before_txt}**{before.bitrate // 1000} kbps**")
+                            value=f"{before_txt}**{before.bitrate // 1000} kbps**\n{now_txt}**{after.bitrate // 1000} kbps**")
 
         if before.user_limit != after.user_limit:
             embed.add_field(name="User Limit Changed:",
-                            value=f"{now_txt}**{after.user_limit}**\n{before_txt}**{before.user_limit}**")
+                            value=f"{before_txt}**{before.user_limit}**\n{now_txt}**{after.user_limit}**")
 
         if before.overwrites != after.overwrites:
             embed = cls.determine_changed_overrides(embed, before, after)
@@ -330,13 +330,13 @@ class ChannelEvents(commands.Cog):
 
         if before.name != after.name:
             embed.add_field(name="Name Changed:",
-                            value=f"{now_txt}**{after.name}**\n{before_txt}**{before.name}**")
+                            value=f"{before_txt}**{before.name}**\n{now_txt}**{after.name}**")
 
         if before.is_nsfw() != after.is_nsfw():
             before_nsfw = "Yes" if before.is_nsfw() else "No"
             after_nsfw = "Yes" if after.is_nsfw() else "No"
             embed.add_field(name="NSFW Status Changed:",
-                            value=f"{now_txt}**{after_nsfw}**\n{before_txt}**{before_nsfw}**")
+                            value=f"{before_txt}**{before_nsfw}**\n{now_txt}**{after_nsfw}**")
 
         if before.overwrites != after.overwrites:
             embed = cls.determine_changed_overrides(embed, before, after)
