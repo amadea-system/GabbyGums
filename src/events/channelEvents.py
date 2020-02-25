@@ -255,7 +255,7 @@ class ChannelEvents(commands.Cog):
 
         if before.name != after.name:
             embed.add_field(name="Name Changed:",
-                            value=f"{before_txt}**{before.name}\n{now_txt}**{after.name}****")
+                            value=f"{before_txt}**{before.name}**\n{now_txt}**{after.name}**")
 
         if before.category != after.category:
             embed.add_field(name="Category Changed",
