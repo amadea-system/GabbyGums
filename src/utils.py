@@ -29,6 +29,38 @@ async def send_long_msg(channel: [discord.TextChannel, commands.Context], messag
         await channel.send(chunk)
 
 
+def split_text(text: Union[str, List], max_size: int = 2000, delimiter: str = "\n") -> List[str]:
+    """Splits the input text such that no entry is longer that the max size """
+    delim_length = len(delimiter)
+
+    if isinstance(text, str):
+        if len(text) < max_size:
+            return [text]
+        text = text.split(delimiter)
+    else:
+        if sum(len(i) for i in text) < max_size:
+            return ["\n".join(text)]
+
+    output = []
+    tmp_str = ""
+    count = 0
+    for fragment in text:
+        fragment_length = len(fragment) + delim_length
+        if fragment_length > max_size:
+            raise ValueError("A single line exceeded the max length. Can not split!")
+        if count + fragment_length > max_size:
+            output.append(tmp_str)
+            tmp_str = ""
+            count = 0
+
+        count += fragment_length
+        tmp_str += f"{fragment}{delimiter}"
+
+    output.append(tmp_str)
+
+    return output
+
+
 async def send_error_msg_to_log(bot: GGBot, error_messages: Optional[Union[str, List[str]]], header: Optional[str] = None, code_block: bool = False,) -> bool:
     """
     Attempts to send a message to the Global Error Discord Channel.

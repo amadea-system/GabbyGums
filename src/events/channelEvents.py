@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING, Union, Optional  # , Dict, List, Tuple, NamedT
 import discord
 from discord.ext import commands
 
+from utils import split_text
+
 if TYPE_CHECKING:
     from bot import GGBot
 
@@ -348,8 +350,7 @@ class ChannelEvents(commands.Cog):
         """Determines which overwrites (if any) have changed, and adds fields to an embed as necessary to reflect those changes."""
         change_msgs = []
         for key, before_overwrites in before.overwrites.items():  # Iterate through the before overwrites
-            after_overwrites = after.overwrites[
-                key] if key in after.overwrites else None  # Get the corresponding new overwrite.
+            after_overwrites = after.overwrites[key] if key in after.overwrites else None  # Get the corresponding new overwrite.
             if before_overwrites != after_overwrites:  # If they have changed
 
                 _type = f"Role" if isinstance(key, discord.Role) else f"Member"  # Record if it's a role or member having the permissions changed.
@@ -364,17 +365,23 @@ class ChannelEvents(commands.Cog):
 
                     # Start constructing the messages
                     changes_msg = []
-                    for i in changes:
-                        perm_name = string.capwords(f"{i[0]}".replace('_', ' '))  # Capitalize the permission names and replace underlines with spaces.
+                    for new in changes:
+                        old = discord.utils.find(lambda old_set: old_set[0] == new[0], before_set)
+                        perm_name = string.capwords(f"{new[0]}".replace('_', ' '))  # Capitalize the permission names and replace underlines with spaces.
                         perm_name = "Send TTS Messages" if perm_name == "Send Tts Messages" else perm_name  # Mak sure that we capitalize the TTS acronym properly.
-                        if i[1] is None:
+                        if new[1] is None:
                             perm_status = "Inherit"
                             perm_status_emoji = "<:Inherit:681237607312654345>"
                         else:  # <:greenCircle:681235935911870508>
-                            perm_status = "Allow" if i[1] is True else "Deny"
-                            perm_status_emoji = "🟢" if i[1] is True else "❌"
+                            perm_status = "Allow" if new[1] is True else "Deny"
+                            perm_status_emoji = "🟢" if new[1] is True else "❌"
 
-                        changes_msg.append(f"**{perm_status_emoji} {perm_name}** is now set to **{perm_status}**")
+                        if old[1] is None:
+                            old_perm_status_emoji = "<:Inherit:681237607312654345>"
+                        else:
+                            old_perm_status_emoji = "🟢" if old[1] is True else "❌"
+
+                        changes_msg.append(f"**{old_perm_status_emoji} ➔ {perm_status_emoji} {perm_name}** is now set to **{perm_status}**")
 
                     body = "\n".join(changes_msg)
                 else:
@@ -384,7 +391,11 @@ class ChannelEvents(commands.Cog):
 
         if len(change_msgs) > 0:
             for change in change_msgs:
-                embed.add_field(name=change[0], value=change[1], inline=False)
+                # embed.add_field(name=change[0], value=change[1], inline=False)
+                split_msgs = split_text(change[1], max_size=1000)
+                for i, msg in enumerate(split_msgs):
+                    header = change[0] if i == 0 else "\N{Zero Width Space}"#f"{change[0]} Cont."
+                    embed.add_field(name=header, value=msg, inline=False)
         return embed
 
 
