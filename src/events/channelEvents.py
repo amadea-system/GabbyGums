@@ -220,7 +220,6 @@ class ChannelEvents(commands.Cog):
         # log.info(f"{event_type} fired!")
         if before.position == after.position:  # Filter out position change spam
 
-            # noinspection PyUnresolvedReferences
             log_ch = await self.bot.get_event_or_guild_logging_channel(before.guild.id, event_type)
 
             if log_ch is not None:
@@ -354,7 +353,8 @@ class ChannelEvents(commands.Cog):
             if before_overwrites != after_overwrites:  # If they have changed
 
                 _type = f"Role" if isinstance(key, discord.Role) else f"Member"  # Record if it's a role or member having the permissions changed.
-                header = f"{_type} Permission Overwrites for @{key.name}:\n"  # Write out the appropriate embed header.
+                prefix = "@" if key.name != "@everyone" else ""
+                header = f"{_type} Permission Overwrites for {prefix}{key.name}:\n"  # Write out the appropriate embed header.
                 if after_overwrites is not None:
                     after_set = set(after_overwrites)
                     before_set = set(before_overwrites)
