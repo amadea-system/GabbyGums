@@ -30,29 +30,29 @@ guild_config_docs = GuildConfigDocs()
 # region Embed Getters
 async def get_event_configuration_embed(ctx: commands.Context, event_configs: GuildLoggingConfig) -> discord.Embed:
 
+    embed = discord.Embed(title="Current Event Configurations")
     guild_logging_channel = await ctx.bot.get_event_or_guild_logging_channel(ctx.guild.id)
 
     if guild_logging_channel is not None:
         default_msg = f"Logging to the default log channel: <#{guild_logging_channel.id}>"
     else:
-        default_msg = "Event disabled. No **Dedicated Log Channel** OR **Default Log Channel** has been configured."
+        default_msg = "Event can not be logged. No **Dedicated Log Channel** OR **Default Log Channel** has been configured."
 
-    event_config_msg_fragments = []
     for event_type in event_configs.available_event_types():
-        event_config_msg_fragments.append(f"**{event_type}:**\n⁃ _{guild_config_docs[event_type].brief}_")
+        event_description = f"**{event_type}**\n⁃ _{guild_config_docs[event_type].brief}_"
+
         event = event_configs[event_type]
         if event is None or (event.log_channel_id is None and event.enabled):
-            event_config_msg_fragments.append(f"⁃ {default_msg}\n")
+            event_status = f"⁃ {default_msg}"
         elif not event.enabled:
-            event_config_msg_fragments.append(f"⁃ Event Currently Disabled\n")
+            event_status = f"⁃ Event Currently Disabled"
         else:
-            event_config_msg_fragments.append(f"⁃ Logging to <#{event.log_channel_id}>\n")
+            event_status = f"⁃ Logging to <#{event.log_channel_id}>"
 
-    event_config_msg_fragments.append(f"\n\n**Enter an event type to edit it's settings or click the 🛑 to exit**")
+        embed.add_field(name="\N{ZERO WIDTH SPACE}", value=f"{event_description}\n{event_status}")
 
-    event_config_msg = "\n".join(event_config_msg_fragments)
+    embed.add_field(name="\N{Zero Width Space}", value=f"\N{Zero Width Space}\n**Enter an event type to edit its settings or click the 🛑 to exit**", inline=False)
 
-    embed = discord.Embed(title="Current Event Configurations", description=event_config_msg)
     return embed
 
 
