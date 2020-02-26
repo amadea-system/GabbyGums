@@ -357,6 +357,71 @@ async def get_number_of_rows_in_messages(pool, table: str = "messages") -> int: 
         return num_of_rows
 
 
+# ----- Banned Systems DB Functions ----- #
+
+@dataclass
+class BannedUser:
+    server_id: int
+    user_id: int
+    system_id: str
+
+
+@db_deco
+async def add_banned_system(pool: asyncpg.pool.Pool, sid: int, system_id: str, user_id: int):
+    """Adds a banned system and an associated Discord User ID to the banned systems table."""
+    async with pool.acquire() as conn:
+        await conn.execute("""INSERT INTO banned_systems(server_id, user_id, system_id) VALUES($1, $2, $3)""", sid, user_id, system_id)
+
+
+@db_deco
+async def get_banned_system(pool: asyncpg.pool.Pool, server_id: int, system_id: str) -> List[BannedUser]:
+    """Returns a list of known Discord user IDs that are linked to the given system ID."""
+    async with pool.acquire() as conn:
+        raw_rows = await conn.fetch(" SELECT * from banned_systems where server_id = $1 AND system_id = $2", server_id, system_id)
+        banned_users = [BannedUser(**row) for row in raw_rows]
+        return banned_users
+
+
+@db_deco
+async def get_banned_system_by_discordid(pool: asyncpg.pool.Pool, server_id: int, user_id: str) -> List[BannedUser]:
+    """Returns a list of known Discord user IDs that are linked to the given system ID."""
+    async with pool.acquire() as conn:
+        # TODO: Optimise this to use only 1 DB call.
+        row = await conn.fetchrow(" SELECT * from banned_systems where server_id = $1 AND user_id = $2", server_id, user_id)
+        if row is None:
+            return []
+        system_id = row['system_id']
+
+        raw_rows = await conn.fetch(" SELECT * from banned_systems where server_id = $1 AND system_id = $2",
+                                    server_id, system_id)
+        banned_users = [BannedUser(**row) for row in raw_rows]
+        return banned_users
+
+
+# @db_deco
+# async def remove_banned_user(pool: asyncpg.pool.Pool, sid: int, user_id: str):
+#     """Removes a discord account from the banned systems table"""
+#     async with pool.acquire() as conn:
+#         await conn.execute("DELETE FROM banned_systems WHERE server_id = $1 AND user_id = $2", sid, user_id)
+
+
+@db_deco
+async def remove_banned_system(pool: asyncpg.pool.Pool, sid: int, system_id: str):
+    """Removes a system and all associated discord accounts from the banned systems table"""
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM banned_systems WHERE server_id = $1 AND system_id = $2", sid, system_id)
+
+
+@db_deco
+async def any_banned_systems(pool: asyncpg.pool.Pool, sid: int) -> bool:
+    """Check to see if there are any banned systems in the guild specified."""
+    async with pool.acquire() as conn:
+        response = await conn.fetchval("select exists(select 1 from banned_systems where server_id = $1)", sid)
+        return response
+
+
+# ----- Debugging DB Functions ----- #
+
 @db_deco
 async def get_cached_messages_older_than(pool, hours: int):
     # This command is limited only to servers that we are Admin/Owner of for privacy reasons.
@@ -464,6 +529,16 @@ async def create_tables(pool):
                                system_pkid          TEXT DEFAULT NULL,
                                member_pkid          TEXT DEFAULT NULL,
                                pk_system_account_id BIGINT DEFAULT NULL
+                           )
+                       ''')
+
+        # Create banned users table
+        await conn.execute('''
+                           CREATE TABLE if not exists banned_systems(
+                               server_id     BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
+                               system_id     TEXT NOT NULL,
+                               user_id       BIGINT NOT NULL,
+                               PRIMARY KEY (server_id, system_id, user_id)
                            )
                        ''')
 

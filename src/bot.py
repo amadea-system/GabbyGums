@@ -19,6 +19,7 @@ extensions = (
     'events.memberUpdate',
     'events.bulkMessageDelete',
     'events.channelEvents',
+    'events.memberBans',
     'cmds.utilities',
     'cmds.dev',
     'cmds.configuration'

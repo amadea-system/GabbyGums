@@ -847,57 +847,6 @@ async def on_member_remove(member: discord.Member):
         await leave_log_channel.send(embed=embed)
 
 
-@client.event
-async def on_member_ban(guild: discord.Guild, user: Union[discord.User, discord.Member]):
-    """ User can be either a User (if they were hackbanned) Or a Member () If they were in the guild when banned"""
-    await log_member_ban_or_unban(guild, user, "ban")
-
-
-@client.event
-async def on_member_unban(guild: discord.Guild, user: discord.User):
-    await log_member_ban_or_unban(guild, user, "unban")
-
-
-async def log_member_ban_or_unban(guild: discord.Guild, user: Union[discord.User, discord.Member], ban_or_unban: str):
-    """ If ban, use "ban". if unban, use "unban" """
-    logging.info(f"User {ban_or_unban} Guild: {guild}, User: {user}")
-    await asyncio.sleep(0.5)
-    if ban_or_unban.lower() == "ban":
-        audit_action = discord.AuditLogAction.ban
-        embed_fn = embeds.member_ban
-        event_type = "member_ban"
-    elif ban_or_unban.lower() == "unban":
-        audit_action = discord.AuditLogAction.unban
-        embed_fn = embeds.member_unban
-        event_type = "member_unban"
-    else:
-        raise ValueError("ban_or_unban must be 'ban' or 'unban' ")
-
-    log_channel = await get_event_or_guild_logging_channel(client.db_pool, guild.id, event_type)
-    if log_channel is None:
-        # Silently fail if no log channel is configured.
-        return
-    # We have a log channel. Start pulling audit logs and doing stuff
-
-    try:
-        audit_log_entries = await utils.get_audit_logs(guild, audit_action, user, timedelta(seconds=30))
-        if len(audit_log_entries) > 0:
-            # Assume the latest entry is the correct entry.
-            # Todo: Maybe Look at the time data and reject if it's too old? Kinda redundent though since we already filter them all out...
-            audit_log = audit_log_entries[0]
-            logging.info("Got logs")
-        else:
-            audit_log = None
-            logging.info("Got NO logs")
-
-    except utils.MissingAuditLogPermissions:
-        audit_log = None
-        logging.info("need perms")
-        # log.info(f"Gabby Gums needs the View Audit Log permission to display who {action_verbage} members.")
-
-    embed = embed_fn(user, audit_log)
-    await log_channel.send(embed=embed)
-
 
 # For debugging purposes only.
 @commands.is_owner()
