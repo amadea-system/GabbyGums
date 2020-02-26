@@ -719,6 +719,7 @@ async def remove_invalid_invites(guild_id: int, current_invites: List[discord.In
 
 async def find_used_invite(member: discord.Member) -> Optional[db.StoredInvite]:
 
+    await asyncio.sleep(3)
     stored_invites: db.StoredInvites = await get_stored_invites(member.guild.id)
     current_invites: List[discord.Invite] = await member.guild.invites()
 
@@ -771,11 +772,16 @@ async def find_used_invite(member: discord.Member) -> Optional[db.StoredInvite]:
               "Server: {}, Member: {}".format(stored_invites, current_invite_debug_msg, repr(member.guild), repr(member))
     logging.info(log_msg)
 
+
+    try_again_for_current_invites: List[discord.Invite] = await member.guild.invites()
+
+
     if 'error_log_channel' in config:
         error_log_channel = client.get_channel(config['error_log_channel'])
         await error_log_channel.send("UNABLE TO DETERMINE INVITE USED.")
         await utils.send_long_msg(error_log_channel, "Stored invites: {}".format(stored_invites), code_block=True)
         await utils.send_long_msg(error_log_channel, "Current invites: {}".format(current_invite_debug_msg), code_block=True)
+        await utils.send_long_msg(error_log_channel, "2nd_try Current invites: {}".format(try_again_for_current_invites), code_block=True)
         await utils.send_long_msg(error_log_channel, "Server: {}".format(repr(member.guild)), code_block=True)
         await utils.send_long_msg(error_log_channel, "Member who joined: {}".format(repr(member)), code_block=True)
 
