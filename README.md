@@ -20,6 +20,11 @@ Logs the following:
 * Bulk Message Deletes
   * Bulk Message Delete Logs are generated as a HTML Web Page to give an easy to visualize, Discord like view of the deleted messages that supports shows not just the message content, but Reactions and Embeds just how they looked on discord. Additionally System IDs, and Member IDs are included for PK posts.
   * These logs can also be generated using the g!archive command. 
+* Channel Creation
+* Channel Deletion
+* Channel Edits
+  * Currently supports all changes except moving channels and determining the person responsible (These will be coming very soon however).
+* Able to warn you (and soon auto-ban) when a user joins that is linked to a Plural Kit Account that has previously been banned from your server. 
 
 All of the different logged events are able to have their own log channels or be disabled entirely.  
 Able to ignore events based on Channel, Category, and/or user.
