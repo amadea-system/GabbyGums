@@ -188,7 +188,7 @@ class MemberBans(commands.Cog):
             if len(banned_users) > 0:
                 log.info(f"Found banned accounts: {banned_users}")
 
-                 # Remove all the banned entries from the DB.
+                # Remove all the banned entries from the DB.
                 log.info(f"Removing system {banned_users[0].system_id} from the banned list.")
                 await db.remove_banned_system(self.bot.db_pool, guild.id, banned_users[0].system_id)
 
