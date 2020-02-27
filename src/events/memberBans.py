@@ -70,7 +70,7 @@ class MemberBans(commands.Cog):
     async def on_member_join(self, member: discord.Member):
         event_type = "member_join"
         
-        await asyncio.sleep(1)  # Make sure the warning is displayed AFTER the New Member Joined Tab for viability.
+        await asyncio.sleep(4)  # Make sure the warning is displayed AFTER the New Member Joined Tab for viability.
         if await db.any_banned_systems(self.bot.db_pool, member.guild.id):  # Make sure that we actually have any banned systems to match against before we hit the PK API.
             # log.info("Guild has banned PK Accounts. Check if current user is banned.")
             try:
