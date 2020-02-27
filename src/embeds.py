@@ -263,7 +263,7 @@ def member_ban(member: discord.Member, audit_log: Optional[discord.AuditLogEntry
     ios_compatible_avatar_url = str(member.avatar_url_as(static_format="png"))
     embed.set_thumbnail(url=ios_compatible_avatar_url)
     embed.add_field(name="Info:",
-                    value="{} was banned from the server.".format(member.display_name),
+                    value="**{}** was banned from the server.".format(member.display_name),
                     inline=False)
 
     if audit_log is not None:
@@ -293,7 +293,7 @@ def member_unban(member: discord.User, audit_log: Optional[discord.AuditLogEntry
     ios_compatible_avatar_url = str(member.avatar_url_as(static_format="png"))
     embed.set_thumbnail(url=ios_compatible_avatar_url)
     embed.add_field(name="Info:",
-                    value="{} was unbanned from the server.".format(member.display_name),
+                    value="**{}** was unbanned from the server.".format(member.display_name),
                     inline=False)
 
     if audit_log is not None:
