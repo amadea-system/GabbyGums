@@ -106,7 +106,7 @@ class MemberBans(commands.Cog):
         embed = discord.Embed(description=desc,
                               color=discord.Color.red(), timestamp=datetime.utcnow())
 
-        embed.set_author(name="⚠️WARNING! A Banned Plural Kit System Joined")
+        embed.set_author(name="⚠️ WARNING! Banned Plural Kit System Joined")
 
         if "avatar_url" in system_info and system_info["avatar_url"] is not None:
             avatar_url = system_info['avatar_url']
