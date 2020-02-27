@@ -772,16 +772,26 @@ async def find_used_invite(member: discord.Member) -> Optional[db.StoredInvite]:
               "Server: {}, Member: {}".format(stored_invites, current_invite_debug_msg, repr(member.guild), repr(member))
     logging.info(log_msg)
 
-
     try_again_for_current_invites: List[discord.Invite] = await member.guild.invites()
 
+    try_again_invite_debug_msg = "Tryagain-invites=["
+    for invite in try_again_for_current_invites:
+        debug_msg = "Invite(code={code}, uses={uses}, max_uses={max_uses}, max_age={max_age}, revoked={revoked}," \
+                    " created_at={created_at})".format(code=invite.code,
+                                                     uses=invite.uses,
+                                                     max_uses=invite.max_uses,
+                                                     max_age=invite.max_age,
+                                                     revoked=invite.revoked,
+                                                     created_at=invite.created_at)
+        try_again_invite_debug_msg = try_again_invite_debug_msg + debug_msg
+        try_again_invite_debug_msg = try_again_invite_debug_msg + "]"
 
     if 'error_log_channel' in config:
         error_log_channel = client.get_channel(config['error_log_channel'])
         await error_log_channel.send("UNABLE TO DETERMINE INVITE USED.")
         await utils.send_long_msg(error_log_channel, "Stored invites: {}".format(stored_invites), code_block=True)
         await utils.send_long_msg(error_log_channel, "Current invites: {}".format(current_invite_debug_msg), code_block=True)
-        await utils.send_long_msg(error_log_channel, "2nd_try Current invites: {}".format(try_again_for_current_invites), code_block=True)
+        await utils.send_long_msg(error_log_channel, "2nd_try Current invites: {}".format(try_again_invite_debug_msg), code_block=True)
         await utils.send_long_msg(error_log_channel, "Server: {}".format(repr(member.guild)), code_block=True)
         await utils.send_long_msg(error_log_channel, "Member who joined: {}".format(repr(member)), code_block=True)
 
