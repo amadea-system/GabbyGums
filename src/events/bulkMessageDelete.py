@@ -38,37 +38,45 @@ class CannotReadMessageHistory(Exception):
 
 class DiscordMarkdown:
 
-    # escape_pattern = re.compile(r"\\([^0-9A-Za-z\s])")
     # codeblock_pattern = re.compile(r"(?P<stag>```)(?:(?P<lang>[a-zA-Z0-9-]+?)\n+)?\n*(?P<content>[^`]+?)\n*(?P<etag>```)")  # Multiline. Group 1 is Code Language (May be None), Group 2 is the content of the block
     codeblock_pattern = re.compile(r"(?P<stag>```)(?:(?P<lang>[a-zA-Z0-9-]+?)\n+)?\n*(?P<content>[\s\S]+?)\n*(?P<etag>```)")  # Multiline. Group 1 is Code Language (May be None), Group 2 is the content of the block
     # inlinecodeblock_pattern: Pattern = re.compile(r"(?P<stag>`)(?P<content>.+?)(?P<etag>`)")
     # inlinecodeblock_pattern = re.compile(r"^[^`\/]*?(`)([^`]*?[^`])(\1)(?!`)", flags=re.MULTILINE)
-    inlinecodeblock_pattern = re.compile(r"(`)(?P<content>[^`]*?[^`])(\1)(?!`)")
-    strikethrough_pattern = re.compile(r"~~(?P<content>.+?)~~(?!_)")  # Singleline. G2 is content.
-    spoiler_pattern = re.compile(r"\|\|(?P<content>.+?)\|\|")  # Singleline. G2 is content.
-    bold_pattern = re.compile(r"\*\*(?P<content>.+?)\*\*")  # Singleline. G2 is content.
-    underline_pattern = re.compile(r"__(?P<content>.+?)__")  # Singleline. G2 is content.
-    italics_pattern1 = re.compile(r"\*(?P<content>.+?)\*")  # Singleline. G2 is content.
-    italics_pattern2 = re.compile(r"_(?P<content>.+?)_")  # Singleline. G2 is content.
+    inlinecodeblock_pattern = re.compile(r"(?<!\\)(`)(?P<content>[^`]*?[^`])(\1)(?!`)")
+    strikethrough_pattern = re.compile(r"(?<!\\)~~(?P<content>.+?)(?<!\\)~~(?!_)")  # Singleline. G2 is content.
+    spoiler_pattern = re.compile(r"(?<!\\)\|\|(?P<content>.+?)(?<!\\)\|\|")  # Singleline. G2 is content.
+    bold_pattern = re.compile(r"(?<!\\)\*\*(?P<content>.+?)(?<!\\)\*\*")  # Singleline. G2 is content.
+    underline_pattern = re.compile(r"(?<!\\)__(?P<content>.+?)(?<!\\)__")  # Singleline. G2 is content.
+    italics_pattern1 = re.compile(r"(?<!\\)\*(?P<content>.+?)(?<!\\)\*")  # Singleline. G2 is content.
+    italics_pattern2 = re.compile(r"(?<!\\)_(?P<content>.+?)(?<!\\)_")  # Singleline. G2 is content.
     blockQuote_pattern = re.compile(r"^(?: *>>> ([\s\S]*))|^(?: *> ([^\n]*\n*))", flags=re.MULTILINE)  # (r"(?: *>>> ([\s\S]*))|(?: *> ([^\n]*))") # (?: *>>> ([\s\S]*))|
+    symbols_pattern = re.compile(r"(?P<content>[^a-zA-Z0-9\s])")
+    escaped_symbols_pattern = re.compile(r"\\(?P<content>[^a-zA-Z0-9\s])")
 
 
-    # @classmethod
-    # def replace(cls, _input: str, replacement: str, start: int, end: int):
-    #     out = f"{_input[:start]}{replacement}{_input[end:]}"
-    #     return out
-    #
-    # @classmethod
-    # def replace_all(cls, _input: str, start_tag: str, end_tag: str, start_group: int, end_group: int, pattern: str) -> str:
-    #     output = input
-    #     while True:
-    #         match = re.search(pattern, output)
-    #         if match is None:
-    #             break
-    #         output = cls.replace(output, end_tag, match.start(end_group), match.end(end_group))
-    #         output = cls.replace(output, start_tag, match.start(start_group), match.end(start_group))
-    #
-    #     return output
+    @classmethod
+    def escape_symbols_repl(cls, m: Match):
+        content = m.group('content')
+        return "\\"+content
+
+
+    @classmethod
+    def escape_symbols(cls, _input: str) -> str:
+        """Adds an extra escape char to every escapable character. Used for code blocks so the escape characters will remain at the end."""
+        output = cls.symbols_pattern.sub(cls.escape_symbols_repl, _input)
+        return output
+
+    @classmethod
+    def remove_escaped_symbol_repl(cls, m: Match):
+        content = m.group('content')
+        return content
+
+    @classmethod
+    def remove_escaped_symbol(cls, _input: str) -> str:
+        """Removes the escape characters."""
+        output = cls.escaped_symbols_pattern.sub(cls.remove_escaped_symbol_repl, _input)
+        return output
+
 
     @classmethod
     def codeblock_repl(cls, m: Match):
@@ -80,7 +88,9 @@ class DiscordMarkdown:
             s_tag = '<div class="pre pre--multiline nohighlight">'
 
         # Clean up the content
-        content = m.group('content')  # Markup(match.group('content')).striptags()
+        content = m.group('content')
+        content = cls.escape_symbols(content)
+
         replacement = f"{s_tag}{content}{e_tag}"
         return replacement
 
@@ -99,6 +109,7 @@ class DiscordMarkdown:
 
         # Clean up the content
         content = m.group('content')  # Markup(match.group('content')).striptags()
+        content = cls.escape_symbols(content)
         replacement = f"{s_tag}{content}{e_tag}"
         return replacement
 
@@ -187,21 +198,20 @@ class DiscordMarkdown:
         output = _input
         # First ensure the input is "safe"
         # output = escape(_input)
-
-        output, count = cls.blockquote(_input)
+        output, count = cls.codeblock(output)  # Codeblock MUST be before inline codeblocks
+        output, count = cls.inline_codeblock(output)  # inline Codeblock MUST be next
+        output, count = cls.blockquote(output)
         output, count = cls.spoiler(output)
         output, count = cls.strikethrough(output)
         output, count = cls.bold(output)
         output, count = cls.underline(output)
         output, count = cls.italics(output)
-        output, count = cls.codeblock(output)  # Codeblock MUST be before inline codeblocks
-        output, count = cls.inline_codeblock(output)  # inline Codeblock MUST last
+        output = cls.remove_escaped_symbol(output)
 
         return output
 
 
 markdown = DiscordMarkdown()
-
 
 class CompositeMessage:
     """Object storage for handling mem cache AND bot cache messages."""
