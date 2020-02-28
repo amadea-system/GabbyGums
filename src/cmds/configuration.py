@@ -1,9 +1,7 @@
 """
-Cog containing various developer only commands used for debugging purposes only.
+Cog containing various GG configuration commands.
 Commands include:
-    devtest
-    dump
-    past_messages
+    Events
 
 Part of the Gabby Gums Discord Logger.
 """
