@@ -6,6 +6,7 @@ Part of the Gabby Gums Discord Logger.
 
 
 import logging
+import hashlib
 from datetime import datetime
 from io import StringIO
 from typing import TYPE_CHECKING, Optional, Dict, List, Union, Tuple, NamedTuple
@@ -59,6 +60,7 @@ def generate_txt_archive(messages: List['CompositeMessage'], channel_name) -> St
     return archive
 
 
+
 def generate_html_archive(channel: 'discord.TextChannel', messages: 'MessageGroups', msg_count: int) -> StringIO:
     archive = StringIO()
 
@@ -66,7 +68,16 @@ def generate_html_archive(channel: 'discord.TextChannel', messages: 'MessageGrou
     output = template.render(ctx=ctx, msg_groups=messages, msg_count=msg_count)
     archive.writelines(output)
     archive.seek(0)
+
     return archive
+
+
+def generate_hash(_input: StringIO) -> str:
+    _input.seek(0)
+    hasher = hashlib.sha256()
+    hasher.update(str(_input.read()).encode('utf-8'))
+    _input.seek(0)
+    return hasher.hexdigest()
 
 
 # Unused, for debugging purposes.

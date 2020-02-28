@@ -540,8 +540,11 @@ class Archive(commands.Cog):
     @commands.command(name="archive",
                       brief="Creates an archive file for the number of messages specified.",
                       description="Creates an archive file for the number of messages specified.")
-    async def archive(self, ctx: commands.Context, number_of_msg: int):
-        channel: discord.TextChannel = ctx.channel
+    async def archive(self, ctx: commands.Context, number_of_msg: int, channel: Optional[discord.TextChannel], message_id: Optional[int]):
+        if channel is None:
+            channel: discord.TextChannel = ctx.channel
+
+        timestamp = discord.Object(message_id) or ctx.message
 
         # Check for permissions
         permissions: discord.Permissions = ctx.channel.permissions_for(ctx.guild.me)
@@ -552,37 +555,41 @@ class Archive(commands.Cog):
             await ctx.send(f"The maximum number of achievable messages is 10000!")
 
         # Todo: Figure out the best number of max number of msg
-        # Todo: Date/Time/snowflake Option?
 
         # Todo: Add archive specific max concurancy error handling
 
-        # Fixme: Uncomment
-        # await ctx.send(
-        #     f"Beginning archive of the last {number_of_msg} messages.")
 
         start_time = time.perf_counter()
-        async with channel.typing():
-            # Get the specified num of messages from this channel BEFORE the command was sent.
-            messages = await channel.history(limit=number_of_msg, before=ctx.message, oldest_first=False).flatten()
-            messages.reverse()  # Reverse the list to get the proper order.
-
-            # alert user if channel has less messages than they asked for.
-            if len(messages) < number_of_msg:
-                number_of_msg = len(messages)
-                await ctx.send(f"#{channel.name} only contained {number_of_msg}. Archiving the entire channel.")
-
+        hist_start_time = time.perf_counter()
+        async with ctx.channel.typing():
             # Construct CompositeMessages with the history we just got and DB data.
             message_groups: MessageGroups = MessageGroups()
-            for msg in messages:
+            actual_msg_count = 0
+
+            # Get the specified num of messages from this channel BEFORE the command was sent.
+
+            async for msg in channel.history(limit=number_of_msg, before=timestamp, oldest_first=True):
+
+                actual_msg_count += 1
                 db_msg = await db.get_cached_message(self.bot.db_pool, ctx.guild.id, msg.id)
                 comp_msg = CompositeMessage(self.bot, msg.id, msg, db_msg)
                 message_groups.append(comp_msg)
 
+            # db_end_time = time.perf_counter()
+            hist_end_time = time.perf_counter()
+        archive_start_time = time.perf_counter()
         # Fixme: Uncomment
-        with chatArchiver.generate_html_archive(channel, message_groups, len(messages)) as archive_file:
+        with chatArchiver.generate_html_archive(channel, message_groups, actual_msg_count) as archive_file:
+            archive_end_time = time.perf_counter()
+            hash_start_time = time.perf_counter()
+            sha_hash = chatArchiver.generate_hash(archive_file)
+            hash_end_time = time.perf_counter()
+
             file_name = f"{channel.name} - Archive.html"
             end_time = time.perf_counter()
-            await ctx.send(f"Archived {number_of_msg} messages in {(end_time - start_time):.2f} seconds.",
+            log.info(f"hist: {(hist_end_time-hist_start_time):.2f},  archive: {(archive_end_time-archive_start_time):.2f}, hash: {(hash_end_time-hash_start_time):.2f}")
+            await ctx.send(f"Archived {actual_msg_count} messages in {(end_time - start_time):.2f} seconds.\n"
+                           f"SHA-256 Hash: `{sha_hash}`",
                            file=discord.File(archive_file, filename=file_name))
 
         # For debugging.
