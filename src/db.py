@@ -330,6 +330,17 @@ async def get_cached_message(pool, sid: int, message_id: int) -> Optional[Cached
         return CachedMessage(**row) if row is not None else None
 
 
+
+@db_deco
+async def get_cached_message_for_archive(conn: asyncpg.connection.Connection, sid: int, message_id: int) -> Optional[CachedMessage]:
+    """This DB function is for bulk selects. As such to avoid wasting time reacquiring a connection for each call,
+    the connection should be obtained in the function calling this function."""
+    row = await conn.fetchrow("SELECT * FROM messages WHERE message_id = $1", message_id)
+    return CachedMessage(**row) if row is not None else None
+    # cached = CachedMsgPKInfo(message_id, sid, row['webhook_author_name'], row['system_pkid'], row['member_pkid'], row['pk_system_account_id']) if row is not None else None
+    # return cached
+
+
 @db_deco
 async def update_cached_message(pool, sid: int, message_id: int, new_content: str):
     async with pool.acquire() as conn:

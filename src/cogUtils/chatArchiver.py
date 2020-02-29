@@ -20,12 +20,6 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-# https://gist.github.com/glombard/7554134
-# md = markdown.Markdown(extensions=['meta'])ch
-# md = markdown.Markdown(output_format="html")
-# md = markdown.Markdown()
-
-
 file_loader = FileSystemLoader(searchpath="./htmlTemplates/")
 env = Environment(loader=file_loader)
 # env.filters['markdown'] = lambda text: Markup(md.convert(text))
@@ -73,6 +67,7 @@ def generate_html_archive(channel: 'discord.TextChannel', messages: 'MessageGrou
 
 
 def generate_hash(_input: StringIO) -> str:
+    """Generates a SHA256 hash for a StringIO Objectt and seeks the Object back to 0 at the end."""
     _input.seek(0)
     hasher = hashlib.sha256()
     hasher.update(str(_input.read()).encode('utf-8'))
@@ -88,6 +83,7 @@ def save_html_archive(channel: 'discord.TextChannel', messages: 'MessageGroups',
 
     with open('archive.html', 'w', encoding="utf-16") as archive:
         archive.writelines(output)
+
 
 # Unused, for debugging purposes.
 def save_htmlDebug_txt_archive(messages: List['CompositeMessage'], channel_name):
