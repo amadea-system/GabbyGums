@@ -1000,6 +1000,7 @@ if __name__ == '__main__':
     client.config = config
     client.db_pool = db_pool
     client.command_prefix = config['bot_prefix']
+    client.hmac_key = bytes(config['hmac_key'], encoding='utf-8')
 
     client.load_cogs()
     client.run(config['token'])

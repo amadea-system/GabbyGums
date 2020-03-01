@@ -3,5 +3,6 @@
   "error_log_channel": 111111111111111111,
   "bot_prefix": "BOT PREFIX!",
   "db_uri": "UTI_TO_POSTGRES_DB",
-  "restricted_features": [111111111111111111, 111111111111111111]
+  "restricted_features": [111111111111111111, 111111111111111111],
+  "hmac_key": "Enter a cryptographically secure pseudorandom token here"
 }

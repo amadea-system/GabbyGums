@@ -32,7 +32,7 @@ class GGBot(commands.Bot):
         super().__init__(*args, **kwargs)
         self.db_pool: Optional[asyncpg.pool.Pool] = None
         self.config: Optional[Dict] = None
-
+        self.hmac_key: Optional[bytes] = None
         self.update_playing.start()
 
 

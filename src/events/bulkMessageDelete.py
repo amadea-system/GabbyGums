@@ -10,6 +10,7 @@ import asyncio
 import time
 import logging
 
+from io import StringIO
 from random import randint
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional, Dict, List, Union, Tuple, NamedTuple, Match, Pattern
@@ -34,6 +35,14 @@ log = logging.getLogger(__name__)
 class CannotReadMessageHistory(Exception):
     def __init__(self):
         super().__init__(f"⚠️Missing the `Read Message History` permission!\n")
+
+
+class CouldNotDownloadFile(Exception):
+    pass
+
+
+class WrongFileType(Exception):
+    pass
 
 
 class DiscordMarkdown:
@@ -212,6 +221,7 @@ class DiscordMarkdown:
 
 
 markdown = DiscordMarkdown()
+
 
 class CompositeMessage:
     """Object storage for handling mem cache AND bot cache messages."""
@@ -566,7 +576,8 @@ class Archive(commands.Cog):
             # Get the specified num of messages from this channel BEFORE the command was sent.
 
             # flatten Implementation
-            messages = await channel.history(limit=number_of_msg, before=timestamp, oldest_first=True).flatten()
+            messages = await channel.history(limit=number_of_msg, before=timestamp, oldest_first=False).flatten()
+            messages.reverse()
             hist_end_time = time.perf_counter()
             db_start_time = time.perf_counter()
 
@@ -580,10 +591,15 @@ class Archive(commands.Cog):
 
         archive_start_time = time.perf_counter()
 
-        with chatArchiver.generate_html_archive(channel, message_groups, actual_msg_count) as archive_file:
+        with await chatArchiver.generate_html_archive(self.bot, channel, message_groups, actual_msg_count) as archive_file:
             archive_end_time = time.perf_counter()
+
+            hmac_start = time.perf_counter()
+            chatArchiver.write_hmac(archive_file, security_key=self.bot.hmac_key)
+            log.info(f"HMAC: {(time.perf_counter()-hmac_start):.2f}")
+
             hash_start_time = time.perf_counter()
-            sha_hash = chatArchiver.generate_hash(archive_file)
+            sha_hash = chatArchiver.generate_SHA256_hash(archive_file)
             hash_end_time = time.perf_counter()
 
             file_name = f"{channel.name} - Archive.html"
@@ -597,6 +613,78 @@ class Archive(commands.Cog):
         # chatArchiver.save_html_archive(channel, message_groups, len(messages))
         # end_time = time.perf_counter()
         # log.info(f"Archived {number_of_msg} messages in {(end_time - start_time):.2f}s for storage in {ctx.guild.id}.")
+
+    # TODO: Move to a commands cog once CompositeMessage is in it's own file.
+    @commands.cooldown(rate=1, per=10, type=commands.BucketType.guild)
+    @commands.max_concurrency(1, per=commands.BucketType.guild, wait=False)
+    @commands.command(name="verify_archive",
+                      aliases=["verify", "va"],
+                      brief="Verifies that an archive file has not been tampered with.",
+                      description="Verifies that an archive file has not been tampered with.")
+    async def verify_cmd(self, ctx: commands.Context):
+        message: discord.Message = ctx.message
+        if len(message.attachments) == 0:
+            await ctx.send("No archive file uploaded!")
+            return
+        try:
+            authentic = await self.verify_archive_file(ctx.message)
+        except CouldNotDownloadFile:
+            await ctx.send("Could not retrieve the uploaded archive file. Discord may be having problems. Please try again in a little bit.")
+            return
+
+        if authentic is None:
+            await ctx.send("Could not retrieve the uploaded archive file. Discord may be having problems. Please try again in a little bit.")
+            return
+        elif authentic:
+            await ctx.message.add_reaction("✅")
+            await ctx.send("✅ The archive file is unmodified!!!")
+        else:
+            await ctx.message.add_reaction("❌")
+            await ctx.send("❌ The archive file has been modified!!!")
+
+
+    async def verify_archive_file(self, message: discord.Message) -> Optional[bool]:
+
+        file: discord.Attachment = message.attachments[0]
+        archive = StringIO()
+
+        try:
+            file_bytes = await file.read()
+            written = archive.write(file_bytes.decode("utf-8"))
+        except (discord.HTTPException, discord.NotFound):
+            raise CouldNotDownloadFile()
+
+        hmac_start = time.perf_counter()
+        authentic = chatArchiver.verify_file(archive, self.bot.hmac_key)
+        log.info(f"Verification Time: {(time.perf_counter() - hmac_start):.2f}")
+
+        return authentic
+
+    # ----- Events ----- #
+
+
+    # @commands.Cog.listener()
+    # async def on_message(self, message: discord.Message):
+    #     """For automatic verification of uploaded Archive Files."""
+    #
+    #     # Make sure it's not a command.
+    #     # Make sure there is an attachment to even do something with...
+    #     if not message.author.bot and not message.content.startswith(self.bot.command_prefix) and len(message.attachments) > 0:
+    #         attachment: discord.Attachment = message.attachments[0]  # Only going to focus on the first attachemnt for now.
+    #         file_name_parts = attachment.filename.split(".")  # split up the file name/extention
+    #         if len(file_name_parts) > 1 and file_name_parts[-1].lower() == "html":  # Make sure it's an HTML file.
+    #             try:
+    #                 authentic = await self.verify_archive_file(message)
+    #             except (CouldNotDownloadFile, chatArchiver.CouldNotFindAuthenticationCode):
+    #                 return  # If we error, do nothing.
+    #
+    #             if authentic:
+    #                 await message.add_reaction("✅")
+    #             else:
+    #                 await message.add_reaction("❌")
+
+
+
 
 
 class BulkMsgDelete(commands.Cog):
@@ -653,7 +741,7 @@ class BulkMsgDelete(commands.Cog):
             await cleanup_message_cache()
             return
 
-        with chatArchiver.generate_html_archive(channel, message_groups, msg_count) as archive_file:
+        with await chatArchiver.generate_html_archive(self.bot, channel, message_groups, msg_count) as archive_file:
             file_name = f"{channel.name} - Archive.html"
             embed = self.get_bulk_delete_embed(msg_count, payload.channel_id)
             await log_channel.send(embed=embed, file=discord.File(archive_file, filename=file_name))
