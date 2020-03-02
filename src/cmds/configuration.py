@@ -26,9 +26,10 @@ guild_config_docs = GuildConfigDocs()
 
 
 # region Embed Getters
-async def get_event_configuration_embed(ctx: commands.Context, event_configs: GuildLoggingConfig) -> discord.Embed:
+async def get_event_configuration_embed(ctx: commands.Context, event_configs: GuildLoggingConfig, final: bool = False) -> discord.Embed:
 
-    embed = discord.Embed(title="Current Event Configurations")
+    embed = discord.Embed(title="Current Event Configurations") if not final else discord.Embed(title="Event Configurations")
+
     guild_logging_channel = await ctx.bot.get_event_or_guild_logging_channel(ctx.guild.id)
 
     if guild_logging_channel is not None:
@@ -49,7 +50,13 @@ async def get_event_configuration_embed(ctx: commands.Context, event_configs: Gu
 
         embed.add_field(name="\N{ZERO WIDTH SPACE}", value=f"{event_description}\n{event_status}")
 
-    embed.add_field(name="\N{Zero Width Space}", value=f"\N{Zero Width Space}\n**Enter an event type to edit its settings or click the 🛑 to exit**", inline=False)
+    if not final:
+        embed.add_field(name="\N{Zero Width Space}", value=f"\N{Zero Width Space}\n**Enter an event type to edit its settings or click the 🛑 to exit the event configuration menu system**", inline=False)
+    else:
+        embed.add_field(name="\N{Zero Width Space}",
+                        value=f"\N{Zero Width Space}\n**Event Configuration Finished!\n"
+                        f"If you need to configure additional events, please use the `{ctx.bot.command_prefix}events` command again.**",
+                        inline=False)
 
     return embed
 
@@ -69,7 +76,8 @@ def get_edit_event_embed(event_type_name: str, event_configs: GuildLoggingConfig
         f"**Click** the 🔀 to turn this event **{onoff_toggle_text}**.\n" \
         f"**Enter** a **new log channel** to change which channel this event will log to.\n" \
         f"**Enter** `clear` to set the logging channel back to the **default log channel**.\n" \
-        f"**Click** the <:backbtn:677188923310735361> to go back to list of all event configurations."
+        f"**Click** the <:backbtn:677188923310735361> to go back to list of all event configurations.\n" \
+        f"**Click** the 🛑 to exit the Event Configuration Menu System."
 
     embed = discord.Embed(title=f"Current {event_type_name} Configuration:",
                           description=msg)
@@ -137,9 +145,10 @@ class Configuration(commands.Cog):
         page = StringReactPage(embed=embed, allowable_responses=event_configs.available_event_types())
         event_type_rsp = await page.run(ctx)
         if event_type_rsp is None:
+            await self.finished_embed(ctx, event_configs)
             return
 
-        edit_buttons = [('🔀', 'toggle'), ('<:backbtn:679032730243301397>', 'back')]#('🔙', 'back')]  # , ('🛑', 'stop')]
+        edit_buttons = [('🔀', 'toggle'), ('<:backbtn:679032730243301397>', 'back')]  # ('🔙', 'back')]  # , ('🛑', 'stop')]
 
         # edit_msg = None
         while True:
@@ -150,11 +159,13 @@ class Configuration(commands.Cog):
 
             if edit_rsp is None:
                 # await ctx.send(f"Done!")
+                await self.finished_embed(ctx, event_configs)
                 return
             # edit_msg = edit_rsp.ui_message
             edit_rsp_str = edit_rsp.response.lower().strip()
             if edit_rsp_str == 'stop':
-                await ctx.send(f"Done!")
+                # await ctx.send(f"Done!")
+                await self.finished_embed(ctx, event_configs)
                 # log.info("exiting config_event_menu via stop button.")
                 return
             elif edit_rsp_str == 'back':
@@ -175,6 +186,13 @@ class Configuration(commands.Cog):
                     event_configs = await self.set_log_channel(ctx, log_chan, event_type_rsp.response, event_configs)
                 except commands.BadArgument:
                     await ctx.send('Invalid channel!')
+
+
+    async def finished_embed(self, ctx: commands.Context, event_configs: GuildLoggingConfig):
+        # Send a final static embed showing the now configured events.
+        final_embed = await get_event_configuration_embed(ctx, event_configs, final=True)
+        await ctx.send(embed=final_embed)
+
 
     async def toggle_event(self, ctx: commands.Context, event_name: str, event_configs: GuildLoggingConfig) -> GuildLoggingConfig:
         # Invert the current status, commit changes to the DB, and alert the user.

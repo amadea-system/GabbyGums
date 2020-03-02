@@ -402,13 +402,17 @@ class StringReactPage(Page):
                 # self.LOG.info(f"Got: {self.match}")
                 if self.match not in self.allowable_responses:
                     content = self.match
-                    possible_match = process.extractOne(content, self.allowable_responses, score_cutoff=50)
-                    best_match = possible_match[0] if possible_match else None
-                    did_you_mean = f"\nDid you mean:" if best_match else ""
-                    self.sent_msg.append(await self.ctx.send(f"`{content}` is not a valid choice. Please try again.{did_you_mean}"))
+                    if content.startswith(ctx.bot.command_prefix):
+                        self.sent_msg.append(
+                            await self.ctx.send(f"It appears that you used a command while a menu system is still running. Disregarding the input."))
+                    else:
+                        possible_match = process.extractOne(content, self.allowable_responses, score_cutoff=50)
+                        best_match = possible_match[0] if possible_match else None
+                        did_you_mean = f"\nDid you mean:" if best_match else ""
+                        self.sent_msg.append(await self.ctx.send(f"`{content}` is not a valid choice. Please try again.{did_you_mean}"))
 
-                    if best_match:
-                        self.sent_msg.append(await self.ctx.send(f"{best_match}"))  # Send as it's own msg so it's easy to copy and paste.
+                        if best_match:
+                            self.sent_msg.append(await self.ctx.send(f"{best_match}"))  # Send as it's own msg so it's easy to copy and paste.
 
                     # Force match and canceled to be None/False to loop around and let the user try again.
                     self.match = None
