@@ -39,7 +39,8 @@ class MemberUpdate(commands.Cog):
                 return
 
             embed = member_nick_update(before, after)
-            await log_channel.send(embed=embed)
+            # await log_channel.send(embed=embed)
+            await self.bot.send_log(log_channel, event_type_nick, embed=embed)
 
 
 def setup(bot):

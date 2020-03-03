@@ -62,7 +62,9 @@ class ChannelEvents(commands.Cog):
             ignored = await self.check_if_ignored(category)  # Only check Category ,Channel is new so it can't be ignored.
             if not ignored:
                 embed = await self.get_channel_create_embed(channel)
-                await log_ch.send(embed=embed)
+
+                # await log_ch.send(embed=embed)
+                await self.bot.send_log(log_ch, event_type, embed=embed)
 
 
     async def get_channel_create_embed(self, channel: GuildChannel) -> discord.Embed:
@@ -144,7 +146,8 @@ class ChannelEvents(commands.Cog):
             ignored = await self.check_if_ignored(channel)
             if not ignored:
                 embed = await self.get_channel_delete_embed(channel)
-                await log_ch.send(embed=embed)
+                # await log_ch.send(embed=embed)
+                await self.bot.send_log(log_ch, event_type, embed=embed)
 
 
     @classmethod
@@ -230,17 +233,20 @@ class ChannelEvents(commands.Cog):
                     if isinstance(before, discord.TextChannel) and isinstance(after, discord.TextChannel):
                         embed = self.get_text_ch_update_embed(before, after)
                         if embed is not None:
-                            await log_ch.send(embed=embed)
+                            # await log_ch.send(embed=embed)
+                            await self.bot.send_log(log_ch, event_type, embed=embed)
 
                     if isinstance(before, discord.VoiceChannel) and isinstance(after, discord.VoiceChannel):
                         embed = self.get_voice_ch_update_embed(before, after)
                         if embed is not None:
-                            await log_ch.send(embed=embed)
+                            # await log_ch.send(embed=embed)
+                            await self.bot.send_log(log_ch, event_type, embed=embed)
 
                     if isinstance(before, discord.CategoryChannel) and isinstance(after, discord.CategoryChannel):
                         embed = self.get_category_ch_update_embed(before, after)
                         if embed is not None:
-                            await log_ch.send(embed=embed)
+                            # await log_ch.send(embed=embed)
+                            await self.bot.send_log(log_ch, event_type, embed=embed)
 
 
     @classmethod

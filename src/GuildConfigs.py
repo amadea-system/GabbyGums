@@ -122,6 +122,13 @@ class GuildLoggingConfig:
                     configs[key] = EventConfig.from_dict(_dict[key])
         return configs
 
+    def contains_channel(self, channel_id: int) -> bool:
+        for value in self.__dict__.items():
+            if isinstance(value, EventConfig):
+                if value.log_channel_id is not None and value.log_channel_id == channel_id:
+                    return True
+
+        return False
 
 class EventConfigDocs:
     """Class for holding documentation for an event type"""

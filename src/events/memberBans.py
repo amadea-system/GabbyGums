@@ -90,7 +90,8 @@ class MemberBans(commands.Cog):
                         # Silently fail if no log channel is configured.
                         return
                     embed = self.banned_pk_account_joined_embed(member, pk_response)
-                    await log_channel.send(embed=embed)
+                    # await log_channel.send(embed=embed)
+                    await self.bot.send_log(log_channel, event_type, embed=embed)
 
 
     def banned_pk_account_joined_embed(self, member: discord.Member, system_info: Dict) -> discord.Embed:
@@ -197,7 +198,8 @@ class MemberBans(commands.Cog):
                     # Silently fail if no log channel is configured.
                     return
                 embed = await self.unban_pk_account_embed(user, pk_response, banned_users, False)
-                await log_channel.send(embed=embed)
+                # await log_channel.send(embed=embed)
+                await self.bot.send_log(log_channel, "member_unban", embed=embed)
 
 
     async def unban_pk_account_embed(self, member: discord.User, system_info: Dict, unbanned_users: List[db.BannedUser], autoban: bool) -> discord.Embed:
@@ -293,8 +295,8 @@ class MemberBans(commands.Cog):
                 embed = self.update_ban_embed_w_pk_account(embed, user, pk_system_info)
         else:
             embed = member_unban(user, audit_log)
-        await log_channel.send(embed=embed)
-
+        # await log_channel.send(embed=embed)
+        await self.bot.send_log(log_channel, event_type, embed=embed)
 
     def update_ban_embed_w_pk_account(self, embed: discord.Embed, member: discord.Member, system_info: Dict) -> discord.Embed:
 

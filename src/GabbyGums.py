@@ -541,9 +541,10 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
                                    message_id=payload.message_id, webhook_info=db_cached_message,
                                    pk_system_owner=pk_system_owner, cached=cache_exists)
 
-    await log_channel.send(embed=embed)
+    # await log_channel.send(embed=embed)
+    await client.send_log(log_channel, event_type, embed=embed)
     if len(attachments) > 0:
-        await log_channel.send(content="Deleted Attachments:", files=attachments)
+        await log_channel.send(content="Deleted Attachments:", files=attachments)  # Not going to bother using the safe log sender here yet.
 
     await cleanup_message_cache()
 
@@ -667,7 +668,8 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
             return
 
         # try:
-        await log_channel.send(embed=embed)
+        # await log_channel.send(embed=embed)
+        await client.send_log(log_channel, event_type, embed=embed)
 
         if db_cached_message is not None:
             await db.update_cached_message(client.db_pool, payload.data['guild_id'], payload.message_id, after_msg)
@@ -817,7 +819,8 @@ async def on_member_join(member: discord.Member):
         # Silently fail if no log channel is configured.
         return
 
-    await log_channel.send(embed=embed)
+    # await log_channel.send(embed=embed)
+    await client.send_log(log_channel, event_type, embed=embed)
 
 
 @client.event
@@ -857,10 +860,13 @@ async def on_member_remove(member: discord.Member):
 
     if audit_log is not None and kick_log_channel is not None:
         embed = embeds.member_kick(member, audit_log)
-        await kick_log_channel.send(embed=embed)
+        # await kick_log_channel.send(embed=embed)
+        await client.send_log(kick_log_channel, event_type_kick, embed=embed)
     elif leave_log_channel is not None:
         embed = embeds.member_leave(member)
-        await leave_log_channel.send(embed=embed)
+        # await leave_log_channel.send(embed=embed)
+        await client.send_log(leave_log_channel, event_type_leave, embed=embed)
+
 
 
 
@@ -912,7 +918,8 @@ async def username_changed_update(before: discord.User, after: discord.User):
         for guild in guilds:
             log_channel = await get_event_or_guild_logging_channel(client.db_pool, guild.id, event_type_name)
             if log_channel is not None:
-                await log_channel.send(embed=embed)
+                # await log_channel.send(embed=embed)
+                await client.send_log(log_channel, event_type_name, embed=embed)
 
 
 async def avatar_changed_update(before: discord.User, after: discord.User):
@@ -941,7 +948,8 @@ async def avatar_changed_update(before: discord.User, after: discord.User):
                     avatar_changed_bytes.seek(0)
                     avatar_changed_img = discord.File(filename=avatar_changed_file_name, fp=avatar_changed_bytes)
                     # Send the embed and file
-                    await log_channel.send(file=avatar_changed_img, embed=embed)
+                    # await log_channel.send(file=avatar_changed_img, embed=embed)
+                    await client.send_log(log_channel, event_type_avatar, embed=embed, file=avatar_changed_img)
 
 
 @client.event

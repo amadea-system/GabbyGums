@@ -744,7 +744,8 @@ class BulkMsgDelete(commands.Cog):
         with await chatArchiver.generate_html_archive(self.bot, channel, message_groups, msg_count) as archive_file:
             file_name = f"{channel.name} - Archive.html"
             embed = self.get_bulk_delete_embed(msg_count, payload.channel_id)
-            await log_channel.send(embed=embed, file=discord.File(archive_file, filename=file_name))
+            # await log_channel.send(embed=embed, file=discord.File(archive_file, filename=file_name))
+            await self.bot.send_log(log_channel, event_type, embed=embed, file=discord.File(archive_file, filename=file_name))
 
         log.info(f"archived {msg_count} messages out of {len(payload.message_ids)} deleted messages.")
         await cleanup_message_cache()

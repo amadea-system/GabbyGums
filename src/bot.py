@@ -4,7 +4,7 @@
 import sys
 import logging
 import traceback
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple, List
 
 
 import discord
@@ -12,6 +12,7 @@ from discord.ext import commands, tasks
 import asyncpg
 
 import db
+from cogUtils.errors import handle_permissions_error
 
 log = logging.getLogger(__name__)
 
@@ -33,6 +34,9 @@ class GGBot(commands.Bot):
         self.db_pool: Optional[asyncpg.pool.Pool] = None
         self.config: Optional[Dict] = None
         self.hmac_key: Optional[bytes] = None
+        # self.alerted_guilds: List[Tuple[str, int]] = []  # Stores a list of guilds that have been alerted to permission problems.
+        self.has_permission_problems: List[int] = []
+
         self.update_playing.start()
 
 
@@ -44,6 +48,17 @@ class GGBot(commands.Bot):
             except Exception as e:
                 log.info(f'Failed to load extension {extension}.', file=sys.stderr)
                 traceback.print_exc()
+
+
+    async def send_log(self, log_ch: discord.TextChannel, event_type: str, embed: Optional[discord.Embed] = None, file: Optional[discord.File] = None) -> discord.Message:
+        log.info(f"sending {event_type} to {log_ch.name}")
+        try:
+            msg = await log_ch.send(embed=embed, file=file)
+            return msg
+        except discord.Forbidden as e:
+            await handle_permissions_error(self, log_ch, event_type, e, None)
+            # await alert_guild_permissions_error(self, log_ch, event_type, e, None)
+
 
     # region Now Playing Update Task Methods
     # noinspection PyCallingNonCallable
