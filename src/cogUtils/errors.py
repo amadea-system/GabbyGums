@@ -26,42 +26,50 @@ async def handle_permissions_error(bot: 'GGBot', errored_channel: discord.TextCh
     guild: discord.Guild = errored_channel.guild
     bot.has_permission_problems.append(guild.id)
 
-    # if guild.id not in bot.alerted_guilds:  # Make sure we don't spam guilds with permission errors.
-    #     bot.alerted_guilds.append(guild.id)
-    #
-    #     guild_owner: discord.User = guild.owner
-    #
-    #     dm_chan: discord.DMChannel = guild_owner.dm_channel
-    #     if dm_chan is None:
-    #         log.info("DM Channel was None. Creating Channel")
-    #         dm_chan = await guild_owner.create_dm()
-    #
-    #     # msg = "⚠ Alert!!\n" \
-    #     #       f"{event_type.capitalize()} logs **can not be sent** in your server *{guild.name}* due to a **permissions problem** with the configured log channel <#{errored_channel.id}> (#{errored_channel.name}) !\n" \
-    #     #     f"This is the only notice you will receive until the next time the bot is rebooted. However, this may not be the only event there may be other permission problems in other channels that would prevent Gabby Gums from logging those events too." \
-    #     #     f"Please fix the permissions error or chose a new log channel that has correctly configured permissions.\n" \
-    #     #     f"You can use the `{bot.command_prefix}permissions` command in your server to debug all the permission problems your server may have.\n" \
-    #     #     f"Feel free to join our support server, <{permissions_error_support_link}>, if you need any assistance in fixing this error."
-    #
-    #     msg = "⚠ Alert!!\n" \
-    #         f"One or more permission errors have been detected in your server *{guild.name}* that is preventing one or more event type logs from being sent to their configured log channels!\n" \
-    #         f"This is the **only notice** you will receive until the next time the bot is rebooted.\n" \
-    #         f"Please fix the permissions error(s) in order to enable Gabby Gums to properly log the events you have configured to be logged.\n" \
-    #         f"You can use the `{bot.command_prefix}permissions` command in your server to debug all the permission problems your server may have.\n" \
-    #         f"Feel free to join our support server, <{permissions_error_support_link}>, if you need any assistance in fixing this error."
-    #
-    #     try:
-    #         await dm_chan.send(msg)
-    #     except discord.Forbidden:
+    ch_perm: discord.Permissions = guild.me.permissions_in(errored_channel)
+    sent_msg = False
+    # Default to logging the perm prob to the affected channel if possible, attempt fall back to the defualt
+    if ch_perm.send_messages:
+        log_ch = errored_channel
+        log_ch_perm = ch_perm
+    else:
+        log_ch = await bot.get_event_or_guild_logging_channel(guild.id)
+        log_ch_perm = guild.me.permissions_in(log_ch) if log_ch != errored_channel else ch_perm
 
-        # # Fall back to this so we can try to help the effected user.
-        # error_msg = f"Could not send permissions error notice to guild {guild.name} ({guild.id})"
-        # log.warning(error_msg)
-        #
-        # if 'error_log_channel' not in bot.config:
-        #     return
-        # error_log_channel = bot.get_channel(bot.config['error_log_channel'])
-        # await error_log_channel.send(error_msg)
+    if log_ch_perm.send_messages:
+        # We are sending the error msg as normal text as it has the highest probability of going through.
+        error_msg = f"\N{WARNING SIGN} Unable to send log in <#{errored_channel.id}> due to the following missing permissions:\n"
 
+        if not ch_perm.send_messages:
+            error_msg += "**Send Messages**\n"
 
+        if not ch_perm.embed_links:
+            error_msg += "**Embed Links**\n"
+
+        if event_type == "channel_update" and not ch_perm.external_emojis:
+            error_msg += "**Use External Emoji**\n"
+
+        if event_type == "message_delete" and not ch_perm.attach_files:
+            error_msg += "**Attach Files**\n"
+
+        error_msg += "\n\n"
+
+        error_msg += f"You can use the `{bot.command_prefix}permissions` command to show all the permission problems your server may have.\n" \
+                     f"If you were trying to disable {event_type} events, please use the {bot.command_prefix}!events command instead of revoking Gabby Gums permissions to help conserve Gabby Gums CPU and Memory resources." \
+                     f"Feel free to join our support server, <{permissions_error_support_link}>, if you need any assistance in fixing this error."
+
+        await log_ch.send(error_msg)
+        sent_msg = True
+
+    error_msg = f"Permissions error in {errored_channel.id} - {guild.id}. Notice sent: {sent_msg}"
+    log.warning(error_msg)
+
+    if 'permissions_error_log_channel' in bot.config:
+        error_log_channel = bot.get_channel(bot.config['permissions_error_log_channel'])
+    elif 'error_log_channel' in bot.config:
+        error_log_channel = bot.get_channel(bot.config['error_log_channel'])
+    else:
+        return
+
+    await error_log_channel.send(error_msg)
 
