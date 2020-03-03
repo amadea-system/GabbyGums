@@ -387,7 +387,7 @@ async def on_command_error(ctx, error):
 @client.event
 async def on_message(message: discord.Message):
 
-    if message.author.id != client.user.id:  # Don't log our own messages.
+    if message.author.id != client.user.id and message.guild is not None:  # Don't log our own messages or DM messages.
 
         message_contents = message.content if message.content != '' else None
 
