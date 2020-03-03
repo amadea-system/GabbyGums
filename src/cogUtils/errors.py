@@ -52,10 +52,10 @@ async def handle_permissions_error(bot: 'GGBot', errored_channel: discord.TextCh
         if event_type == "message_delete" and not ch_perm.attach_files:
             error_msg += "**Attach Files**\n"
 
-        error_msg += "\n\n"
+        error_msg += "\n"
 
         error_msg += f"You can use the `{bot.command_prefix}permissions` command to show all the permission problems your server may have.\n" \
-                     f"If you were trying to disable {event_type} events, please use the {bot.command_prefix}!events command instead of revoking Gabby Gums permissions to help conserve Gabby Gums CPU and Memory resources." \
+                     f"If you were trying to disable {event_type} events, please use the {bot.command_prefix}!events command instead of revoking Gabby Gums permissions to help conserve Gabby Gums CPU and Memory resources.\n" \
                      f"Feel free to join our support server, <{permissions_error_support_link}>, if you need any assistance in fixing this error."
 
         await log_ch.send(error_msg)
