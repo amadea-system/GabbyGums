@@ -30,7 +30,6 @@ auth_key_pattern = re.compile(r"<!--([0-9a-f]+)-->")
 
 
 def md(_input):
-    log.info("converting markdown")
     out = markdown.markdown(_input)
     return out
 
