@@ -13,6 +13,7 @@ from jinja2 import escape
 
 log = logging.getLogger(__name__)
 
+
 class DiscordMarkdown:
     # TODO: Consider optimising by not using lazy quantifiers: https://www.rexegg.com/regex-quantifiers.html
     # codeblock_pattern = re.compile(r"(?P<stag>```)(?:(?P<lang>[a-zA-Z0-9-]+?)\n+)?\n*(?P<content>[^`]+?)\n*(?P<etag>```)")  # Multiline. Group 1 is Code Language (May be None), Group 2 is the content of the block
@@ -34,6 +35,8 @@ class DiscordMarkdown:
 
     suppresed_embed_link_pattern = re.compile(r"&lt;(?P<content>http[s]?:\/\/\S+?)&gt;")
     web_link_pattern = re.compile(r"\[(.+)\]\([^\n\S]*?(http[s]?:\/\/[\S]+?)[^\n\S]*?\)|(http[s]?:\/\/[\S]+)")  # TODO: Consider optimising by having normal links match first.
+    nitro_emote_pattern = re.compile(r"&lt;(?P<animated>a)?:(?P<name>[0-9a-zA-Z_]{2,32}):(?P<id>[0-9]{15,21})&gt;")
+    womboji_pattern = re.compile(r"([a-zA-Z0-9!-;=?-~\s]*)?\s*<a?:[0-9a-zA-Z_]{2,32}:[0-9]{15,21}>\s*([a-zA-Z0-9!-;=?-~\s]*)?")  # http://www.asciitable.com/
 
 
     @classmethod
@@ -208,6 +211,60 @@ class DiscordMarkdown:
 
 
     @classmethod
+    def emojify_repl(cls, m: Match):
+        # animated, name, id
+        s_tag = '<img class="emoji" alt="'
+
+        m1_tag = '" title="'
+        m2_tag = '" src="'
+        e_tag = '">'
+        if m.group('animated'):
+            # animated emoji
+            emoji_url = f"https://cdn.discordapp.com/emojis/{m.group('id')}.gif"
+        else:
+            emoji_url = f"https://cdn.discordapp.com/emojis/{m.group('id')}.png"
+
+        replacement = f"{s_tag}{m.group('name')}{m1_tag}{m.group('name')}{m2_tag}{emoji_url}{e_tag}"
+        return replacement
+
+
+    @classmethod
+    def wombojify_repl(cls, m: Match):
+        s_tag = '<img class="emoji emoji--large" alt="'
+
+        m1_tag = '" title="'
+        m2_tag = '" src="'
+        e_tag = '">'
+        if m.group('animated'):
+            # animated emoji
+            emoji_url = f"https://cdn.discordapp.com/emojis/{m.group('id')}.gif"
+        else:
+            emoji_url = f"https://cdn.discordapp.com/emojis/{m.group('id')}.png"
+
+        replacement = f"{s_tag}{m.group('name')}{m1_tag}{m.group('name')}{m2_tag}{emoji_url}{e_tag}"
+        return replacement
+
+
+    @classmethod
+    def emojify(cls, _input: str, original_txt: str) -> str:
+        womboji = True
+        # check if we need big or small emoji:
+        womboji_matchs: List[Tuple[str, str]] = cls.womboji_pattern.findall(original_txt)
+
+        for match in womboji_matchs:
+            if match[0] != '' or match[1] != '':
+                womboji = False
+                break
+
+        if womboji:
+            output = cls.nitro_emote_pattern.sub(cls.wombojify_repl, _input)
+        else:
+            output = cls.nitro_emote_pattern.sub(cls.emojify_repl, _input)
+
+        return output
+
+
+    @classmethod
     def markdown(cls, _input: str) -> str:
         output = _input
         # First ensure the input is "safe"
@@ -225,6 +282,7 @@ class DiscordMarkdown:
         output, count = cls.underline(output)
         output, count = cls.italics(output)
         output = cls.linkify(output)
+        output = cls.emojify(output, _input)
 
         # UNESCAPING MUST BE LAST
         output = cls.remove_escaped_symbol(output)
