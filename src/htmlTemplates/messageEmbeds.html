@@ -1,0 +1,108 @@
+                {# Embeds #}
+                {% for embed in msg.embeds %}
+                <div class="chatlog__embed">
+                    {% if embed.color %}
+                    <div class="chatlog__embed-color-pill" style="background-color: rgb( {{ embed.color.r }},{{ embed.color.g }},{{ embed.color.b }} )"></div>
+                    {% else %}
+                    <div class="chatlog__embed-color-pill chatlog__embed-color-pill--default"></div>
+                    {% endif %}
+                    <div class="chatlog__embed-content-container">
+                        <div class="chatlog__embed-content">
+                            <div class="chatlog__embed-text">
+                                {# Author #}
+                                {% if embed.author %}
+                                <div class="chatlog__embed-author">
+                                    {% if embed.author.icon_url %}
+                                    <img class="chatlog__embed-author-icon" src="{{ embed.author.icon_url }}" alt="Author icon" />
+                                    {% endif %}
+
+                                    {% if embed.author.name %}
+                                    <span class="chatlog__embed-author-name">
+                                        {% if embed.author.url %}
+                                        <a class="chatlog__embed-author-name-link" href="{{ embed.author.url }}">{{ embed.author.name | e }}</a>
+                                        {% else %}
+                                        {{ embed.author.name | e }}
+                                        {% endif %}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+
+                                {# Title #}
+                                {% if embed.title %}
+                                <div class="chatlog__embed-title">
+                                    {% if embed.url %}
+                                    <a class="chatlog__embed-title-link" href="{{ embed.url }}"><span class="markdown">{{ embed.title }}</span></a> {# Markdown #}
+                                    {% else %}
+                                    <span class="markdown">{{ embed.title }}</span>  {# Markdown #}
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+
+                                {# Description #}
+                                {% if embed.description %}
+                                <div class="chatlog__embed-description"><span class="markdown">{{ embed.description }}</span></div>  {# Markdown #}
+                                {% endif %}
+
+                                {# Fields #}
+                                {% if embed.fields %}
+                                <div class="chatlog__embed-fields">
+                                    {% for field in embed.fields %}
+                                    <div class="chatlog__embed-field {% if field.inline %} chatlog__embed-field--inline {% endif %}">
+                                        {% if field.name %}
+                                        <div class="chatlog__embed-field-name"><span class="markdown">{{ field.name }}</span></div>  {# Markdown #}
+                                        {% endif %}
+                                        {% if field.value %}
+                                        <div class="chatlog__embed-field-value"><span class="markdown">{{ field.value }}</span></div>  {# Markdown #}
+                                        {% endif %}  {# I added this. Why wasn't it already here? #}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            {# Thumbnail #}
+                            {% if embed.thumbnail %}
+                            <div class="chatlog__embed-thumbnail-container">
+                                <a class="chatlog__embed-thumbnail-link" href="{{ embed.thumbnail.url }}">
+                                    <img class="chatlog__embed-thumbnail" src="{{ embed.thumbnail.url }}" alt="Thumbnail" />
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        {# Image #}
+                        {% if embed.image %}
+                        <div class="chatlog__embed-image-container">
+                            <a class="chatlog__embed-image-link" href="{{ embed.image.url }}">
+                                <img class="chatlog__embed-image" src="{{ embed.image.url }}" alt="Image" />
+                            </a>
+                        </div>
+                        {% endif %}
+
+                        {# Footer #}
+                        {% if embed.footer or embed.timestamp %}
+                        <div class="chatlog__embed-footer">
+                            {% if embed.footer %}
+                            {% if embed.footer.text and embed.footer.icon_url %}
+                            <img class="chatlog__embed-footer-icon" src="{{ embed.footer.icon_url }}" alt="Footer icon" />
+                            {% endif %}
+                            {% endif %}
+
+                            <span class="chatlog__embed-footer-text">
+                                {% if embed.footer %}
+                                {% if embed.footer.text %}
+                                {{ embed.footer.text | e }}
+                                {% if embed.timestamp %} • {% endif %}
+                                {% endif %}
+                                {% endif %}
+
+                                {% if embed.timestamp %}
+                                {{ embed.timestamp.strftime('%d/%m/%Y %H:%M:%S UTC') | e }}
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
