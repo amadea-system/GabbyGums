@@ -5,7 +5,6 @@ Part of the Gabby Gums Discord Logger.
 """
 
 import hmac
-import regex as re
 import logging
 import hashlib
 
@@ -14,7 +13,11 @@ from datetime import datetime
 from io import StringIO, SEEK_END, SEEK_SET
 from typing import TYPE_CHECKING, Optional, Dict, List, Union, Tuple, NamedTuple, Match
 
+import regex as re
+
 from jinja2 import Template, Environment, FileSystemLoader
+
+from cogUtils.discordMarkdownParser import markdown
 
 if TYPE_CHECKING:
     from events.bulkMessageDelete import CompositeMessage, MessageGroups
@@ -25,8 +28,16 @@ log = logging.getLogger(__name__)
 
 auth_key_pattern = re.compile(r"<!--([0-9a-f]+)-->")
 
+
+def md(_input):
+    log.info("converting markdown")
+    out = markdown.markdown(_input)
+    return out
+
+
 file_loader = FileSystemLoader(searchpath="./htmlTemplates/")
 env = Environment(loader=file_loader)
+env.globals['markdown'] = md
 env.trim_blocks = True
 env.lstrip_blocks = True
 template = env.get_template('mainChat.html')

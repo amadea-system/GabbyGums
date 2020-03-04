@@ -41,7 +41,7 @@
 
                                 {# Description #}
                                 {% if embed.description %}
-                                <div class="chatlog__embed-description"><span class="markdown">{{ embed.description }}</span></div>  {# Markdown #}
+                                <div class="chatlog__embed-description"><span class="markdown">{{ markdown(embed.description) }}</span></div>  {# Markdown #}
                                 {% endif %}
 
                                 {# Fields #}
@@ -53,7 +53,7 @@
                                         <div class="chatlog__embed-field-name"><span class="markdown">{{ field.name }}</span></div>  {# Markdown #}
                                         {% endif %}
                                         {% if field.value %}
-                                        <div class="chatlog__embed-field-value"><span class="markdown">{{ field.value }}</span></div>  {# Markdown #}
+                                        <div class="chatlog__embed-field-value"><span class="markdown">{{ markdown(field.value) }}</span></div>  {# Markdown #}
                                         {% endif %}  {# I added this. Why wasn't it already here? #}
                                     </div>
                                     {% endfor %}
