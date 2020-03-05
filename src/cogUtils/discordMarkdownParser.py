@@ -16,23 +16,16 @@ log = logging.getLogger(__name__)
 
 class DiscordMarkdown:
     # TODO: Consider optimising by not using lazy quantifiers: https://www.rexegg.com/regex-quantifiers.html
-    # codeblock_pattern = re.compile(r"(?P<stag>```)(?:(?P<lang>[a-zA-Z0-9-]+?)\n+)?\n*(?P<content>[^`]+?)\n*(?P<etag>```)")  # Multiline. Group 1 is Code Language (May be None), Group 2 is the content of the block
-    codeblock_pattern = re.compile(r"(?P<stag>```)(?:(?P<lang>[a-zA-Z0-9-]+?)\n+)?\n*(?P<content>[\s\S]+?)\n*(?P<etag>```)")  # Multiline. Group 1 is Code Language (May be None), Group 2 is the content of the block
-    # inlinecodeblock_pattern: Pattern = re.compile(r"(?P<stag>`)(?P<content>.+?)(?P<etag>`)")
-    # inlinecodeblock_pattern = re.compile(r"^[^`\/]*?(`)([^`]*?[^`])(\1)(?!`)", flags=re.MULTILINE)
+    codeblock_pattern = re.compile(r"(?P<stag>```)(?:(?P<lang>[a-zA-Z0-9-]+?)\n+)?\n*(?P<content>[\s\S]+?)\n*(?P<etag>```)")  # Multiline.
     inlinecodeblock_pattern = re.compile(r"(?<!\\)(`)(?P<content>[^`]*?[^`])(\1)(?!`)")
-    strikethrough_pattern = re.compile(r"(?<!\\)~~(?P<content>.+?)(?<!\\)~~(?!_)")  # Singleline. G2 is content.
-    spoiler_pattern = re.compile(r"(?<!\\)\|\|(?P<content>.+?)(?<!\\)\|\|")  # Singleline. G2 is content.
-    bold_pattern = re.compile(r"(?<!\\)\*\*(?P<content>.+?)(?<!\\)\*\*")  # Singleline. G2 is content.
-    underline_pattern = re.compile(r"(?<!\\)__(?P<content>.+?)(?<!\\)__")  # Singleline. G2 is content.
-    italics_pattern1 = re.compile(r"(?<!\\)\*(?P<content>.+?)(?<!\\)\*")  # Singleline. G2 is content.
-    italics_pattern2 = re.compile(r"(?<!\\)_(?P<content>.+?)(?<!\\)_")  # Singleline. G2 is content.
-    # incompat_blockQuote_pattern = re.compile(r"^(?: *>>> ([\s\S]*))|^(?: *> ([^\n]*\n*))", flags=re.MULTILINE)  # (r"(?: *>>> ([\s\S]*))|(?: *> ([^\n]*))") # (?: *>>> ([\s\S]*))|
-    blockQuote_pattern = re.compile(r"^(?: *&gt;&gt;&gt; ([\s\S]*))|^(?: *&gt; ([^\n]*\n*))",
-                                    flags=re.MULTILINE)  # (r"(?: *>>> ([\s\S]*))|(?: *> ([^\n]*))") # (?: *>>> ([\s\S]*))|
+    strikethrough_pattern = re.compile(r"(?<!\\)~~(?P<content>.+?)(?<!\\)~~(?!_)")  # Singleline.
+    spoiler_pattern = re.compile(r"(?<!\\)\|\|(?P<content>.+?)(?<!\\)\|\|")  # Singleline.
+    bold_pattern = re.compile(r"(?<!\\)\*\*(?P<content>.+?)(?<!\\)\*\*")  # Singleline.
+    underline_pattern = re.compile(r"(?<!\\)__(?P<content>.+?)(?<!\\)__")  # Singleline.
+    italics_pattern = re.compile(r"(?:(?<!\\)\*(?P<s_content>.+?)(?<!\\)\*)|(?:(?<!\\)_(?P<u_content>.+?)(?<!\\)_)")
+    blockQuote_pattern = re.compile(r"^(?: *&gt;&gt;&gt; ([\s\S]*))|^(?: *&gt; ([^\n]*\n*))", flags=re.MULTILINE)  # (r"(?: *>>> ([\s\S]*))|(?: *> ([^\n]*))") # (?: *>>> ([\s\S]*))|
     symbols_pattern = re.compile(r"(?P<content>[^a-zA-Z0-9\s])")
     escaped_symbols_pattern = re.compile(r"\\(?P<content>[^a-zA-Z0-9\s])")
-
     suppresed_embed_link_pattern = re.compile(r"&lt;(?P<content>http[s]?:\/\/\S+?)&gt;")
     web_link_pattern = re.compile(r"\[(.+)\]\([^\n\S]*?(http[s]?:\/\/[\S]+?)[^\n\S]*?\)|(http[s]?:\/\/[\S]+)")  # TODO: Consider optimising by having normal links match first.
     nitro_emote_pattern = re.compile(r"&lt;(?P<animated>a)?:(?P<name>[0-9a-zA-Z_]{2,32}):(?P<id>[0-9]{15,21})&gt;")
@@ -40,7 +33,7 @@ class DiscordMarkdown:
 
 
     @classmethod
-    def escape_symbols_repl(cls, m: Match):
+    def escape_symbols_repl(cls, m: Match) -> str:
         content = m.group('content')
         return "\\"+content
 
@@ -52,7 +45,7 @@ class DiscordMarkdown:
         return output
 
     @classmethod
-    def remove_escaped_symbol_repl(cls, m: Match):
+    def remove_escaped_symbol_repl(cls, m: Match) -> str:
         content = m.group('content')
         return content
 
@@ -64,7 +57,7 @@ class DiscordMarkdown:
 
 
     @classmethod
-    def codeblock_repl(cls, m: Match):
+    def codeblock_repl(cls, m: Match) -> str:
         e_tag = "</div>"
 
         if m.group("lang") is not None:
@@ -81,9 +74,9 @@ class DiscordMarkdown:
 
 
     @classmethod
-    def codeblock(cls, _input: str) -> Tuple[str, int]:
+    def codeblock(cls, _input: str) -> str:
 
-        output = cls.codeblock_pattern.subn(cls.codeblock_repl, _input)
+        output = cls.codeblock_pattern.sub(cls.codeblock_repl, _input)
         return output
 
 
@@ -99,62 +92,74 @@ class DiscordMarkdown:
         return replacement
 
     @classmethod
-    def inline_codeblock(cls, _input: str) -> Tuple[str, int]:
-        output = cls.inlinecodeblock_pattern.subn(cls.inline_codeblock_repl, _input)
+    def inline_codeblock(cls, _input: str) -> str:
+        output = cls.inlinecodeblock_pattern.sub(cls.inline_codeblock_repl, _input)
         return output
 
     # region foldpls
 
     @classmethod
-    def spoiler(cls, _input: str) -> Tuple[str, int]:
+    def spoiler(cls, _input: str) -> str:
         s_tag = '<span class="spoiler">'
         e_tag = "</span>"
         repl = r"{}\g<content>{}".format(s_tag, e_tag)
-        output = cls.spoiler_pattern.subn(repl, _input)
+        output = cls.spoiler_pattern.sub(repl, _input)
         return output
 
 
     @classmethod
-    def bold(cls, _input: str) -> Tuple[str, int]:
+    def bold(cls, _input: str) -> str:
         first_tag = '<strong>'
         end_tag = "</strong>"
         repl = r"{}\g<content>{}".format(first_tag, end_tag)
-        output = cls.bold_pattern.subn(repl, _input)
+        output = cls.bold_pattern.sub(repl, _input)
         return output
 
 
     @classmethod
-    def underline(cls, _input: str) -> Tuple[str, int]:
+    def underline(cls, _input: str) -> str:
         first_tag = '<u>'
         end_tag = "</u>"
         repl = r"{}\g<content>{}".format(first_tag, end_tag)
-        output = cls.underline_pattern.subn(repl, _input)
+        output = cls.underline_pattern.sub(repl, _input)
         return output
 
 
     @classmethod
-    def italics(cls, _input: str) -> Tuple[str, int]:
-        first_tag = '<em>'
-        end_tag = "</em>"
-        repl = r"{}\g<content>{}".format(first_tag, end_tag)
-        output, count = cls.italics_pattern1.subn(repl, _input)
-        output, count2 = cls.italics_pattern2.subn(repl, output)
+    def italics_repl(cls, m: Match) -> Optional[str]:
+        s_tag = '<em>'
+        e_tag = "</em>"
 
-        return output, count+count2
+        if m.group("s_content") is not None:
+            replacement = f"{s_tag}{m.group('s_content')}{e_tag}"
+        elif m.group("u_content") is not None:
+            replacement = f"{s_tag}{m.group('u_content')}{e_tag}"
+        else:
+            log.warning("No content match in italics_repl")
+            replacement = None
+
+        return replacement
 
 
     @classmethod
-    def strikethrough(cls, _input: str) -> Tuple[str, int]:
+    def italics(cls, _input: str) -> str:
+
+        output = cls.italics_pattern.sub(cls.italics_repl, _input)
+        return output
+
+
+    @classmethod
+    def strikethrough(cls, _input: str) -> str:
         first_tag = "<s>"
         end_tag = "</s>"
         repl = r"{}\g<content>{}".format(first_tag, end_tag)
-        output = cls.strikethrough_pattern.subn(repl, _input)
+        output = cls.strikethrough_pattern.sub(repl, _input)
         return output
     # endregion
 
 
     @classmethod
-    def blockquote_repl(cls, m: Match):
+    def blockquote_repl(cls, m: Match) -> str:
         s_tag = '<div class="quote">'
         e_tag = "</div>"
 
@@ -173,8 +178,8 @@ class DiscordMarkdown:
 
 
     @classmethod
-    def blockquote(cls, _input: str) -> Tuple[str, int]:
-        output = cls.blockQuote_pattern.subn(cls.blockquote_repl, _input)
+    def blockquote(cls, _input: str) -> str:
+        output = cls.blockQuote_pattern.sub(cls.blockquote_repl, _input)
         return output
 
 
@@ -188,7 +193,7 @@ class DiscordMarkdown:
 
 
     @classmethod
-    def linkify_repl(cls, m: Match):
+    def linkify_repl(cls, m: Match) -> str:
         s_tag = '<a href="'
         m_tag = '">'
         e_tag = "</a>"
@@ -211,7 +216,7 @@ class DiscordMarkdown:
 
 
     @classmethod
-    def emojify_repl(cls, m: Match):
+    def emojify_repl(cls, m: Match) -> str:
         # animated, name, id
         s_tag = '<img class="emoji" alt="'
 
@@ -229,7 +234,7 @@ class DiscordMarkdown:
 
 
     @classmethod
-    def wombojify_repl(cls, m: Match):
+    def wombojify_repl(cls, m: Match) -> str:
         s_tag = '<img class="emoji emoji--large" alt="'
 
         m1_tag = '" title="'
@@ -271,16 +276,16 @@ class DiscordMarkdown:
         output = escape(_input)
 
         # CODE BLOCKS MUST BE FIRST
-        output, count = cls.codeblock(output)  # Codeblock MUST be before inline codeblocks
-        output, count = cls.inline_codeblock(output)  # inline Codeblock MUST be next
+        output = cls.codeblock(output)  # Codeblock MUST be before inline codeblocks
+        output = cls.inline_codeblock(output)  # inline Codeblock MUST be next
 
         output = cls.remove_suppressed_embed_arrows(output)
-        output, count = cls.blockquote(output)
-        output, count = cls.spoiler(output)
-        output, count = cls.strikethrough(output)
-        output, count = cls.bold(output)
-        output, count = cls.underline(output)
-        output, count = cls.italics(output)
+        output = cls.blockquote(output)
+        output = cls.spoiler(output)
+        output = cls.strikethrough(output)
+        output = cls.bold(output)
+        output = cls.underline(output)
+        output = cls.italics(output)
         output = cls.linkify(output)
         output = cls.emojify(output, _input)
 
