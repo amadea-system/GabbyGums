@@ -365,6 +365,7 @@ class Archive(commands.Cog):
             log.info(f"Archived {number_of_msg} messages in {(end_time - start_time):.2f} seconds.")
 
     # TODO: Move to a commands cog once CompositeMessage is in it's own file.
+    @commands.guild_only()
     @commands.has_permissions(manage_messages=True)
     @commands.cooldown(rate=1, per=10, type=commands.BucketType.guild)
     @commands.max_concurrency(1, per=commands.BucketType.guild, wait=False)
