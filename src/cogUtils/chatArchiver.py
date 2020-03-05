@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-auth_key_pattern = re.compile(r"<!--([0-9a-f]+)-->")
+auth_key_pattern = re.compile(r"^<!--([0-9a-f]+)-->$")
 
 
 def md(_input):
@@ -126,7 +126,6 @@ def write_hmac(_input: StringIO, security_key: bytes):
 
 def verify_file(file: StringIO, security_key: bytes) -> bool:
 
-
     file.seek(0, SEEK_END)  # Seek to the end of the file. so we can iterate backward.
     pos = file.tell()  # store the position that is the end of the file.
     # log.info(f"Pos: {pos}")
@@ -160,8 +159,9 @@ def verify_file(file: StringIO, security_key: bytes) -> bool:
                 log.info("Authentication Code mismatch. File has been modified.")
                 return False
 
-    raise CouldNotFindAuthenticationCode("Could not find authentication code in the archive file!")
-
+    log.info("Could not find authentication code in the archive file!")
+    # raise CouldNotFindAuthenticationCode("Could not find authentication code in the archive file!")
+    return False
 
 # Unused, for debugging purposes.
 def save_html_archive(channel: 'discord.TextChannel', messages: 'MessageGroups', msg_count: int):
