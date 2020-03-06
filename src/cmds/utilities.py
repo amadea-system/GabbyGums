@@ -20,7 +20,7 @@ import discord
 from discord.ext import commands
 
 import db
-from cogUtils.paginator import FieldPages
+from utils.paginator import FieldPages
 # from embeds import member_nick_update
 
 if TYPE_CHECKING:
