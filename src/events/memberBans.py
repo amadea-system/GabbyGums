@@ -22,7 +22,7 @@ from discord.ext import commands
 import aiohttp
 
 from embeds import member_ban, member_unban
-from utils import get_audit_logs, MissingAuditLogPermissions, split_text
+from miscUtils import get_audit_logs, MissingAuditLogPermissions, split_text
 import db
 
 if TYPE_CHECKING:

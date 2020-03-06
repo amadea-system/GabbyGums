@@ -21,7 +21,7 @@ from discord.utils import oauth_url
 
 import db
 import embeds
-import utils
+import miscUtils
 import GuildConfigs
 from imgUtils.avatarChangedImgProcessor import get_avatar_changed_image
 from bot import GGBot
@@ -577,7 +577,7 @@ async def cache_pk_message_details(guild_id: int, pk_response: Dict):
         msg = "'WARNING! 'id' not in PK msg API Data. Aborting JSON Decode!"
         error_msg.append(msg)
         logging.warning(msg)
-        await utils.send_error_msg_to_log(client, error_msg, header=f"{error_header}!ERROR!")
+        await miscUtils.send_error_msg_to_log(client, error_msg, header=f"{error_header}!ERROR!")
         return
 
     if 'sender' in pk_response:  # User ID of the account that sent the pre-proxied message. Presumed to be linked to the PK Account
@@ -606,7 +606,7 @@ async def cache_pk_message_details(guild_id: int, pk_response: Dict):
     await db.update_cached_message_pk_details(client.db_pool, guild_id, message_id, system_pk_id, member_pk_id, sender_discord_id)
 
     if len(error_msg) > 0:
-        await utils.send_error_msg_to_log(client, error_msg, header=error_header)
+        await miscUtils.send_error_msg_to_log(client, error_msg, header=error_header)
 
 
 @client.event
@@ -791,11 +791,11 @@ async def find_used_invite(member: discord.Member) -> Optional[db.StoredInvite]:
     if 'error_log_channel' in config:
         error_log_channel = client.get_channel(config['error_log_channel'])
         await error_log_channel.send("UNABLE TO DETERMINE INVITE USED.")
-        await utils.send_long_msg(error_log_channel, "Stored invites: {}".format(stored_invites), code_block=True)
-        await utils.send_long_msg(error_log_channel, "Current invites: {}".format(current_invite_debug_msg), code_block=True)
-        await utils.send_long_msg(error_log_channel, "2nd_try Current invites: {}".format(try_again_invite_debug_msg), code_block=True)
-        await utils.send_long_msg(error_log_channel, "Server: {}".format(repr(member.guild)), code_block=True)
-        await utils.send_long_msg(error_log_channel, "Member who joined: {}".format(repr(member)), code_block=True)
+        await miscUtils.send_long_msg(error_log_channel, "Stored invites: {}".format(stored_invites), code_block=True)
+        await miscUtils.send_long_msg(error_log_channel, "Current invites: {}".format(current_invite_debug_msg), code_block=True)
+        await miscUtils.send_long_msg(error_log_channel, "2nd_try Current invites: {}".format(try_again_invite_debug_msg), code_block=True)
+        await miscUtils.send_long_msg(error_log_channel, "Server: {}".format(repr(member.guild)), code_block=True)
+        await miscUtils.send_long_msg(error_log_channel, "Member who joined: {}".format(repr(member)), code_block=True)
 
     await update_invite_cache(member.guild, invites=current_invites)
     return None
@@ -838,7 +838,7 @@ async def on_member_remove(member: discord.Member):
     if kick_log_channel is not None:  # Don't try to see if it's a kick if we shouldn't log kicks
         guild: discord.Guild = member.guild
         try:
-            audit_log_entries = await utils.get_audit_logs(guild, discord.AuditLogAction.kick, member, timedelta(seconds=30))
+            audit_log_entries = await miscUtils.get_audit_logs(guild, discord.AuditLogAction.kick, member, timedelta(seconds=30))
             if len(audit_log_entries) > 0:
                 # Assume the latest entry is the correct entry.
                 # Todo: Maybe Look at the time data and reject if it's too old? Kinda redundent though since we already filter them all out...
@@ -850,7 +850,7 @@ async def on_member_remove(member: discord.Member):
                 # logging.info(f"No audit log entries present")
                 audit_log = None
 
-        except utils.MissingAuditLogPermissions:
+        except miscUtils.MissingAuditLogPermissions:
             # log.info(f"{member.name} left.")
             # log.info(f"Gabby Gums needs the View Audit Log permission to display who kicked the member.")
             # logging.info("Need more perms")

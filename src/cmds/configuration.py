@@ -14,7 +14,7 @@ import discord
 from discord.ext import commands
 
 import db
-import utils
+import miscUtils
 from uiElements import StringPage, StringReactPage, Page
 from GuildConfigs import GuildLoggingConfig, EventConfig, GuildConfigDocs
 

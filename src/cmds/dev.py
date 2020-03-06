@@ -16,7 +16,7 @@ import discord
 from discord.ext import commands
 
 import db
-import utils
+import miscUtils
 
 if TYPE_CHECKING:
     from bot import GGBot
@@ -67,7 +67,7 @@ class Dev(commands.Cog):
                 f"PK Account: <@{row['pk_system_account_id']}> message: \n**{row['content']}**"
 
             logging.info(log_msg)
-            await utils.send_long_msg(ctx, log_msg)
+            await miscUtils.send_long_msg(ctx, log_msg)
             await asyncio.sleep(1)
 
 

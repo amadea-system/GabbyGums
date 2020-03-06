@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Union, Optional  # , Dict, List, Tuple, NamedT
 import discord
 from discord.ext import commands
 
-from utils import split_text
+from miscUtils import split_text
 
 if TYPE_CHECKING:
     from bot import GGBot

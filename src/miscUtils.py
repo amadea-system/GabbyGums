@@ -1,3 +1,13 @@
+"""
+General helper functions for Gabby Gums.
+Function abilities include:
+    Functions for handling long text
+    Sending Error Logs to the Global error log channel
+    Getting Audit logs.
+    
+Part of the Gabby Gums Discord Logger.
+"""
+
 import textwrap
 from typing import Union, Optional, Dict, List
 import logging
