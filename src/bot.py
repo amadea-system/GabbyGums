@@ -12,7 +12,7 @@ from discord.ext import commands, tasks
 import asyncpg
 
 import db
-from cogUtils.errors import handle_permissions_error
+from utils.errors import handle_permissions_error
 
 log = logging.getLogger(__name__)
 
