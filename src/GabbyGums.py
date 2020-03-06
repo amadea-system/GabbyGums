@@ -9,7 +9,7 @@ import logging
 import traceback
 import asyncio
 from pathlib import Path
-from typing import Optional, List, Dict, Union
+from typing import TYPE_CHECKING, Optional, List, Dict, Union
 from datetime import timedelta
 
 import psutil
@@ -25,6 +25,9 @@ import miscUtils
 import GuildConfigs
 from imgUtils.avatarChangedImgProcessor import get_avatar_changed_image
 from bot import GGBot
+
+if TYPE_CHECKING:
+    from events.memberJoinLeave import MemberJoinLeave
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s")
 
@@ -99,10 +102,6 @@ async def on_ready():
     # await client.change_presence(status=discord.Status.online, activity=activity)
 
     # ensure the invite cache is upto date on connection.
-    logging.info("Refreshing Invite Cache.")
-    for guild in client.guilds:
-        await update_invite_cache(guild)
-
     logging.warning("Gabby Gums is fully loaded.")
 
 
@@ -293,59 +292,7 @@ async def reset_server_info(ctx: commands.Context):
     await ctx.send("**ALL Settings have been reset!**")
 
 
-# ----- Invite Commands ----- #
-@commands.has_permissions(manage_messages=True)
-@commands.guild_only()
-@client.group(name="invites",
-              brief="Allows for naming invites for easier identification and listing details about them.",
-              description="Allows for naming invites for easier identification and listing details about them.",
-              usage='<command> [Invite ID]')
-async def invite_manage(ctx: commands.Context):
-    if not ctx.guild.me.guild_permissions.manage_guild:
-        await ctx.send("⚠ Gabby gums needs the **Manage Server** permission for invite tracking.")
-        return
-    else:
-        if ctx.invoked_subcommand is None:
-            await ctx.send_help(invite_manage)
 
-
-@invite_manage.command(name="list", brief="Lists the invites in the server and if they have a defined name.")
-async def _list_invites(ctx: commands.Context):
-    if ctx.guild.me.guild_permissions.manage_guild:
-        await update_invite_cache(ctx.guild)  # refresh the invite cache.
-        invites: db.StoredInvites = await get_stored_invites(ctx.guild.id)
-        embed = discord.Embed(title="Current Invites", color=0x9932CC)
-
-        embed_count = 0
-        for invite in invites.invites:
-            embed.add_field(name=invite.invite_id,
-                            value="Uses: {}\n Nickname: {}".format(invite.uses, invite.invite_name))
-            embed_count += 1
-            if embed_count == 25:
-                await ctx.send(embed=embed)
-                embed = discord.Embed(title="Current Invites Cont.", color=0x9932CC)
-
-        if embed_count % 25 != 0:
-            await ctx.send(embed=embed)
-
-
-@invite_manage.command(name="name", brief="Lets you give an invite a nickname so it can be easier to identify.",
-                       usage='invites name [Invite ID] [Invite Nickname]')
-async def _name_invite(ctx: commands.Context, invite_id: discord.Invite, nickname: str = None):
-    bot: GGBot = ctx.bot
-    if ctx.guild.me.guild_permissions.manage_guild:
-        await update_invite_cache(ctx.guild)  # refresh the invite cache.
-        await db.update_invite_name(bot.db_pool, ctx.guild.id, invite_id.id, invite_name=nickname)
-        await ctx.send("{} has been given the nickname: {}".format(invite_id.id, nickname))
-
-
-@invite_manage.command(name="unname", brief="Removes the name from an invite.")
-async def _unname_invite(ctx: commands.Context, invite_id: discord.Invite):
-    bot: GGBot = ctx.bot
-    if ctx.guild.me.guild_permissions.manage_guild:
-        await update_invite_cache(ctx.guild)  # refresh the invite cache.
-        await db.update_invite_name(bot.db_pool, ctx.guild.id, invite_id.id)
-        await ctx.send("{} no longer has a nickname.".format(invite_id.id))
 
 
 @commands.is_owner()
@@ -565,7 +512,6 @@ def verify_message_is_preproxy_message(message_id: int, pk_response: Dict) -> bo
         return True
 
 
-
 async def cache_pk_message_details(guild_id: int, pk_response: Dict):
 
     error_msg = []
@@ -675,201 +621,6 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
             await db.update_cached_message(client.db_pool, payload.data['guild_id'], payload.message_id, after_msg)
 
 
-async def get_stored_invites(guild_id: int) -> db.StoredInvites:
-    stored_invites = await db.get_invites(client.db_pool, guild_id)
-    return stored_invites
-
-
-async def update_invite_cache(guild: discord.Guild, invites: Optional[List[discord.Invite]] = None,
-                              stored_invites: Optional[db.StoredInvites] = None):
-    try:
-        if not guild.me.guild_permissions.manage_guild:
-            return
-
-        if invites is None:
-            invites: List[discord.Invite] = await guild.invites()
-
-        for invite in invites:
-            await db.store_invite(client.db_pool, guild.id, invite.id, invite.uses)
-
-        if stored_invites is None:
-            stored_invites = await get_stored_invites(guild.id)
-
-        await remove_invalid_invites(guild.id, invites, stored_invites)
-    except discord.Forbidden as e:
-        logging.exception("update_invite_cache error: {}".format(e))
-
-        if 'error_log_channel' not in config:
-            return
-        error_log_channel = client.get_channel(config['error_log_channel'])
-        await error_log_channel.send(e)
-
-
-async def remove_invalid_invites(guild_id: int, current_invites: List[discord.Invite], stored_invites: Optional[db.StoredInvites]):
-
-    def search_for_invite(_current_invites: List[discord.Invite], invite_id):
-        for invite in _current_invites:
-            if invite.id == invite_id:
-                return invite
-        return None
-
-    for stored_invite in stored_invites.invites:
-        current_invite = search_for_invite(current_invites, stored_invite.invite_id)
-        if current_invite is None:
-            await db.remove_invite(client.db_pool, guild_id, stored_invite.invite_id)
-
-
-async def find_used_invite(member: discord.Member) -> Optional[db.StoredInvite]:
-
-    await asyncio.sleep(3)
-    stored_invites: db.StoredInvites = await get_stored_invites(member.guild.id)
-    current_invites: List[discord.Invite] = await member.guild.invites()
-
-    if member.bot:
-        # The member is a bot. An oauth invite was used.
-        await update_invite_cache(member.guild, invites=current_invites)
-        return None
-
-    new_invites: List[discord.Invite] = []  # This is where we will store newly created invites.
-    # invite_used: Optional[db.StoredInvite] = None
-    for current_invite in current_invites:
-        stored_invite = stored_invites.find_invite(current_invite.id)
-        if stored_invite is None:
-            new_invites.append(current_invite)  # This is a new Invite. store it so we have it in case we need it
-        else:
-            if current_invite.uses > stored_invite.uses:
-                # We have a matched invite!
-                stored_invite.uses = current_invite.uses  # Correct the count of the stored invite.
-                stored_invite.actual_invite = current_invite
-                await update_invite_cache(member.guild, invites=current_invites)
-                return stored_invite  # Todo: FIX! This works, unless we somehow missed the last user join.
-            else:
-                pass  # not the used invite. look at the next invite.
-    # We scanned through all the current invites and was unable to find a match from the cache. Look through new invites
-
-    for new_invite in new_invites:
-        if new_invite.uses > 0:
-            # Todo: FIX! This works, unless we somehow missed the last user join.
-            invite_used = db.StoredInvite(server_id=new_invite.guild.id, invite_id=new_invite.id,
-                                          uses=new_invite.uses, invite_name="New Invite!", actual_invite=new_invite)
-            await update_invite_cache(member.guild, invites=current_invites)
-            return invite_used
-
-    # Somehow we STILL haven't found the invite that was used... I don't think we should ever get here, unless I forgot something...
-    # We should never get here, so log it very verbosly in case we do so I can avoid it in the future.
-    current_invite_debug_msg = "invites=["
-    for invite in current_invites:
-        debug_msg = "Invite(code={code}, uses={uses}, max_uses={max_uses}, max_age={max_age}, revoked={revoked}," \
-              " created_at={created_at}, inviter={inviter}, guild={guild})".format(code=invite.code, uses=invite.uses,
-                                                                                   max_uses=invite.max_uses,
-                                                                                   max_age=invite.max_age,
-                                                                                   revoked=invite.revoked,
-                                                                                   created_at=invite.created_at,
-                                                                                   inviter=invite.inviter,
-                                                                                   guild=invite.guild)
-        current_invite_debug_msg = current_invite_debug_msg + debug_msg
-    current_invite_debug_msg = current_invite_debug_msg + "]"
-
-    log_msg = "UNABLE TO DETERMINE INVITE USED.\n Stored invites: {}, Current invites: {} \n" \
-              "Server: {}, Member: {}".format(stored_invites, current_invite_debug_msg, repr(member.guild), repr(member))
-    logging.info(log_msg)
-
-    try_again_for_current_invites: List[discord.Invite] = await member.guild.invites()
-
-    try_again_invite_debug_msg = "Tryagain-invites=["
-    for invite in try_again_for_current_invites:
-        debug_msg = "Invite(code={code}, uses={uses}, max_uses={max_uses}, max_age={max_age}, revoked={revoked}," \
-                    " created_at={created_at})".format(code=invite.code,
-                                                     uses=invite.uses,
-                                                     max_uses=invite.max_uses,
-                                                     max_age=invite.max_age,
-                                                     revoked=invite.revoked,
-                                                     created_at=invite.created_at)
-        try_again_invite_debug_msg = try_again_invite_debug_msg + debug_msg
-        try_again_invite_debug_msg = try_again_invite_debug_msg + "]"
-
-    if 'error_log_channel' in config:
-        error_log_channel = client.get_channel(config['error_log_channel'])
-        await error_log_channel.send("UNABLE TO DETERMINE INVITE USED.")
-        await miscUtils.send_long_msg(error_log_channel, "Stored invites: {}".format(stored_invites), code_block=True)
-        await miscUtils.send_long_msg(error_log_channel, "Current invites: {}".format(current_invite_debug_msg), code_block=True)
-        await miscUtils.send_long_msg(error_log_channel, "2nd_try Current invites: {}".format(try_again_invite_debug_msg), code_block=True)
-        await miscUtils.send_long_msg(error_log_channel, "Server: {}".format(repr(member.guild)), code_block=True)
-        await miscUtils.send_long_msg(error_log_channel, "Member who joined: {}".format(repr(member)), code_block=True)
-
-    await update_invite_cache(member.guild, invites=current_invites)
-    return None
-
-
-@client.event
-async def on_member_join(member: discord.Member):
-    event_type = "member_join"
-
-    if member.guild.me.guild_permissions.manage_guild:
-        invite_used = await find_used_invite(member)
-        if invite_used is not None:
-            logging.info(
-                "New user joined with link {} that has {} uses.".format(invite_used.invite_id, invite_used.uses))
-        embed = embeds.member_join(member, invite_used)
-    else:
-        embed = embeds.member_join(member, None, manage_guild=False)
-
-    log_channel = await get_event_or_guild_logging_channel(client.db_pool, member.guild.id, event_type)
-    if log_channel is None:
-        # Silently fail if no log channel is configured.
-        return
-
-    # await log_channel.send(embed=embed)
-    await client.send_log(log_channel, event_type, embed=embed)
-
-
-@client.event
-async def on_member_remove(member: discord.Member):
-    event_type_leave = "member_leave"
-    event_type_kick = "member_kick"
-
-    leave_log_channel = await get_event_or_guild_logging_channel(client.db_pool, member.guild.id, event_type_leave)
-    kick_log_channel = await get_event_or_guild_logging_channel(client.db_pool, member.guild.id, event_type_kick)
-    if leave_log_channel is None and kick_log_channel is None:
-        # Silently fail if no log channel is configured.
-        return
-    # We have a log channel. Start pulling audit logs and doing stuff
-
-    if kick_log_channel is not None:  # Don't try to see if it's a kick if we shouldn't log kicks
-        guild: discord.Guild = member.guild
-        try:
-            audit_log_entries = await miscUtils.get_audit_logs(guild, discord.AuditLogAction.kick, member, timedelta(seconds=30))
-            if len(audit_log_entries) > 0:
-                # Assume the latest entry is the correct entry.
-                # Todo: Maybe Look at the time data and reject if it's too old? Kinda redundent though since we already filter them all out...
-                audit_log = audit_log_entries[0]
-                # reason = f" because: {audit_log.reason}" if audit_log.reason else ". No Reason was given"
-                # logging.info(f"Got Audit log entries")
-                # return
-            else:
-                # logging.info(f"No audit log entries present")
-                audit_log = None
-
-        except miscUtils.MissingAuditLogPermissions:
-            # log.info(f"{member.name} left.")
-            # log.info(f"Gabby Gums needs the View Audit Log permission to display who kicked the member.")
-            # logging.info("Need more perms")
-            audit_log = None
-    else:
-        audit_log = None
-
-    if audit_log is not None and kick_log_channel is not None:
-        embed = embeds.member_kick(member, audit_log)
-        # await kick_log_channel.send(embed=embed)
-        await client.send_log(kick_log_channel, event_type_kick, embed=embed)
-    elif leave_log_channel is not None:
-        embed = embeds.member_leave(member)
-        # await leave_log_channel.send(embed=embed)
-        await client.send_log(leave_log_channel, event_type_leave, embed=embed)
-
-
-
-
 # For debugging purposes only.
 @commands.is_owner()
 @client.command(name="pfp")
@@ -958,8 +709,8 @@ async def on_guild_join(guild: discord.Guild):
     #  Having it here is fragile as a user could add the bot and on_guild_join may not ever fire if the bot is down at the time.
     # create an entry for the server in the database
     await db.add_server(client.db_pool, guild.id, guild.name)
-
-    await update_invite_cache(guild)
+    invites: 'MemberJoinLeave' = client.get_cog('MemberJoinLeave')
+    await invites.update_invite_cache(guild)
 
     # Log it for support and DB debugging purposes
     log_msg = "Gabby Gums joined **{} ({})**, owned by:** {} - {}#{} ({})**".format(guild.name, guild.id, guild.owner.display_name, guild.owner.name, guild.owner.discriminator, guild.owner.id)

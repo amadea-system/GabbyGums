@@ -14,16 +14,15 @@ import asyncio
 import logging
 
 from datetime import timedelta, datetime
-from typing import TYPE_CHECKING, Optional, Dict, List, Union, Tuple, NamedTuple
+from typing import TYPE_CHECKING, Optional, Dict, List, Union
 
 import discord
 from discord.ext import commands
 
-import aiohttp
-
 from embeds import member_ban, member_unban
 from miscUtils import get_audit_logs, MissingAuditLogPermissions, split_text
 import db
+from utils.pluralKit import get_pk_system_from_userid, CouldNotConnectToPKAPI
 
 if TYPE_CHECKING:
     from bot import GGBot
@@ -31,96 +30,9 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-class CouldNotConnectToPKAPI(Exception):
-    pass
-
-
-async def get_pk_system_from_userid(user_id: int) -> Optional[Dict]:
-
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f'https://api.pluralkit.me/v1/a/{user_id}') as r:
-                if r.status == 200:  # We received a valid response from the PK API.
-                    logging.info(f"User has an associated PK Account linked to thier Discord Account.")
-
-                    # Convert the JSON response to a dict
-                    pk_response = await r.json()
-
-                    # Unpack and return.
-                    logging.info(f"Got system: {pk_response}")
-                    # system_id = pk_response['id']
-                    # return system_id
-                    return pk_response
-                elif r.status == 404:
-                    # No PK Account found.
-                    log.info("No PK Account found.")
-                    return None
-
-    except aiohttp.ClientError as e:
-        raise CouldNotConnectToPKAPI  # Really not strictly necessary, but it makes the code a bit nicer I think.
-
-
 class MemberBans(commands.Cog):
     def __init__(self, bot: 'GGBot'):
         self.bot = bot
-
-
-    # TODO: Merge this event into the other on-member-join once it's been moved into a cog.
-    @commands.Cog.listener()
-    async def on_member_join(self, member: discord.Member):
-        event_type = "member_join"
-        
-        await asyncio.sleep(4)  # Make sure the warning is displayed AFTER the New Member Joined Tab for viability.
-        if await db.any_banned_systems(self.bot.db_pool, member.guild.id):  # Make sure that we actually have any banned systems to match against before we hit the PK API.
-            # log.info("Guild has banned PK Accounts. Check if current user is banned.")
-            try:
-                pk_response = await get_pk_system_from_userid(member.id)
-                system_id = pk_response['id'] if pk_response is not None else None
-            except CouldNotConnectToPKAPI:
-                pk_response = None
-                system_id = None  # add warning message to embed or maybe retry later?
-
-            if system_id is not None and pk_response is not None:
-                banned_users = await db.get_banned_system(self.bot.db_pool, member.guild.id, system_id)
-                if len(banned_users) > 0:
-                    # log.info(f"This system ({system_id}) is banned. It is advised that this discord account be banned.")
-
-                    log_channel = await self.bot.get_event_or_guild_logging_channel(member.guild.id, event_type)
-                    if log_channel is None:
-                        # Silently fail if no log channel is configured.
-                        return
-                    embed = self.banned_pk_account_joined_embed(member, pk_response)
-                    # await log_channel.send(embed=embed)
-                    await self.bot.send_log(log_channel, event_type, embed=embed)
-
-
-    def banned_pk_account_joined_embed(self, member: discord.Member, system_info: Dict) -> discord.Embed:
-
-        if 'name' in system_info and system_info['name'] is not None:
-            desc = "**{}** - System ID: **{}**\n\nLinked to: <@{}> - {}#{}".format(system_info['name'], system_info['id'], member.id, member.name, member.discriminator)
-            info_value = f"Warning! <@{member.id}> is linked to a Plural Kit system, **{system_info['name']}**, that is banned from this server!\n"
-
-        else:
-            desc = "PK System ID: **{}**\n\nLinked to: <@{}> - {}#{}".format(system_info['id'], member.id, member.name, member.discriminator)
-            info_value = f"Warning! <@{member.id}> is linked to a Plural Kit system, ID: **{system_info['id']}**, that is banned from this server!\n"
-
-        embed = discord.Embed(description=desc,
-                              color=discord.Color.red(), timestamp=datetime.utcnow())
-
-        embed.set_author(name="⚠️ WARNING! Banned Plural Kit System Joined")
-
-        if "avatar_url" in system_info and system_info["avatar_url"] is not None:
-            avatar_url = system_info['avatar_url']
-            ios_compatible_avatar_url = avatar_url
-            embed.set_thumbnail(url=ios_compatible_avatar_url)
-
-        embed.add_field(name="Info:",
-                        value=info_value,
-                        inline=False)
-
-        embed.set_footer(text="System ID: {}".format(system_info['id']))
-
-        return embed
 
 
     @commands.Cog.listener()

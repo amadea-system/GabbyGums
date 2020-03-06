@@ -5,7 +5,7 @@
 import discord
 from discord.ext import commands
 from datetime import datetime
-from typing import Optional, Union
+from typing import Optional, Dict, Union
 from db import StoredInvite, CachedMessage
 import logging
 
@@ -156,7 +156,7 @@ def unknown_deleted_message(channel_id, message_id) -> discord.Embed:
     return embed
 
 
-def member_join(member: discord.Member, invite: Optional[StoredInvite], manage_guild=True) -> discord.Embed:
+def member_join(member: discord.Member, invite: Optional[StoredInvite], pk_info: Optional[Dict], manage_guild=True) -> discord.Embed:
     embed = discord.Embed(description="<@!{}> - {}#{}".format(member.id, member.name, member.discriminator),
                           color=0x00ff00, timestamp=datetime.utcnow())
 
@@ -172,7 +172,20 @@ def member_join(member: discord.Member, invite: Optional[StoredInvite], manage_g
                     inline=False)
     account_age = datetime.utcnow() - member.created_at
     embed.add_field(name="Account Age", value="**{}** days old".format(account_age.days), inline=True)
-    embed.add_field(name="Current Member Count", value="**{}** Members".format(member.guild.member_count))
+    embed.add_field(name="Current Member Count", value="**{}** Members".format(member.guild.member_count), inline=True)
+
+    if pk_info is not None:
+        embed.add_field(name="\N{Zero Width Space}‌‌‌", value="\n__**Plural Kit Information**__", inline=False)
+        # embed.add_field(name="\N{Zero Width Space}‌‌‌", value="\N{Zero Width Space}", inline=True)  # Add a blank embed to force the PK info onto it's own line.
+
+        if "name" in pk_info:
+            embed.add_field(name="System Name", value=pk_info['name'], inline=True)
+        embed.add_field(name="System ID", value=pk_info['id'], inline=True)
+
+        # Compute the account age
+        pk_created_date = datetime.strptime(pk_info['created'], '%Y-%m-%dT%H:%M:%S.%fZ')
+        pk_account_age = datetime.utcnow() - pk_created_date
+        embed.add_field(name="PK Account Age", value=f"**{pk_account_age.days}** days old", inline=True)
 
     if invite is not None:
         embed.add_field(name=" ‌‌‌", value="\n__**Invite Information**__", inline=False)

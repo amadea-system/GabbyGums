@@ -17,13 +17,15 @@ from utils.errors import handle_permissions_error
 log = logging.getLogger(__name__)
 
 extensions = (
+    'events.memberJoinLeave',
     'events.memberUpdate',
     'events.bulkMessageDelete',
     'events.channelEvents',
     'events.memberBans',
     'cmds.utilities',
     'cmds.dev',
-    'cmds.configuration'
+    'cmds.configuration',
+    'cmds.inviteManagement',
 )
 
 
@@ -31,11 +33,13 @@ class GGBot(commands.Bot):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.pk_id: int = 466378653216014359  # Plural Kit's Account ID.
         self.db_pool: Optional[asyncpg.pool.Pool] = None
         self.config: Optional[Dict] = None
         self.hmac_key: Optional[bytes] = None
         # self.alerted_guilds: List[Tuple[str, int]] = []  # Stores a list of guilds that have been alerted to permission problems.
         self.has_permission_problems: List[int] = []
+        self.invites_initialized = False
 
         self.update_playing.start()
 
