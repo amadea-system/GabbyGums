@@ -17,7 +17,7 @@ import regex as re
 
 from jinja2 import Template, Environment, FileSystemLoader
 
-from cogUtils.discordMarkdownParser import markdown
+from utils.discordMarkdownParser import markdown
 
 if TYPE_CHECKING:
     from events.bulkMessageDelete import CompositeMessage, MessageGroups
