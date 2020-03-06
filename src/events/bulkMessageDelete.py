@@ -24,8 +24,8 @@ from jinja2 import Markup, escape
 
 import db
 # import utils
-import cogUtils.chatArchiver as chatArchiver
-from cogUtils.discordMarkdownParser import markdown
+import utils.chatArchiver as chatArchiver
+from utils.discordMarkdownParser import markdown
 
 if TYPE_CHECKING:
     from bot import GGBot
