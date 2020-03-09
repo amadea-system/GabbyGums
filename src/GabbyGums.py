@@ -350,11 +350,14 @@ async def on_message(message: discord.Message):
                 logging.info("Saving Attachment from {}".format(message.guild.id))
                 try:
                     await attachment.save("./image_cache/{}/{}".format(message.guild.id, attachment_filename))
+                    attachments.append(attachment_filename)
                 except FileNotFoundError as e:
                     # If the directory(s) do not exist, create them and then re-save
                     Path("./image_cache/{}".format(message.guild.id)).mkdir(parents=True, exist_ok=True)
                     await attachment.save("./image_cache/{}/{}".format(message.guild.id, attachment_filename))
-                attachments.append(attachment_filename)
+                    attachments.append(attachment_filename)
+                except Exception as e:
+                    await miscUtils.log_error_msg(client, e)
 
         if message_contents is not None or attachments is not None:
             webhook_author_name = message.author.display_name if message.webhook_id is not None else None
@@ -523,7 +526,7 @@ async def cache_pk_message_details(guild_id: int, pk_response: Dict):
         msg = "'WARNING! 'id' not in PK msg API Data. Aborting JSON Decode!"
         error_msg.append(msg)
         logging.warning(msg)
-        await miscUtils.send_error_msg_to_log(client, error_msg, header=f"{error_header}!ERROR!")
+        await miscUtils.log_error_msg(client, error_msg, header=f"{error_header}!ERROR!")
         return
 
     if 'sender' in pk_response:  # User ID of the account that sent the pre-proxied message. Presumed to be linked to the PK Account
@@ -552,7 +555,7 @@ async def cache_pk_message_details(guild_id: int, pk_response: Dict):
     await db.update_cached_message_pk_details(client.db_pool, guild_id, message_id, system_pk_id, member_pk_id, sender_discord_id)
 
     if len(error_msg) > 0:
-        await miscUtils.send_error_msg_to_log(client, error_msg, header=error_header)
+        await miscUtils.log_error_msg(client, error_msg, header=error_header)
 
 
 @client.event
