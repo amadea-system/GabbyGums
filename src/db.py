@@ -3,7 +3,7 @@ For use with Gabby Gums
 
 """
 
-
+import math
 import time
 import json
 import logging
@@ -237,18 +237,19 @@ async def get_ignored_categories(pool, sid: int) -> List[int]:  # Good
 # ----- Invite DB Functions ----- #
 
 @db_deco
-async def store_invite(pool, sid: int, invite_id: str, invite_uses: int = 0):
+async def store_invite(pool, sid: int, invite_id: str, invite_uses: int = 0, max_uses: Optional[int] = None, inviter_id: Optional[str] = None, created_at: Optional[datetime] = None):
     async with pool.acquire() as conn:
         does_exist = await conn.fetchval("select exists(select 1 from invites where server_id = $1 and invite_id = $2)", sid, invite_id)
         if does_exist is False:
-            await add_new_invite(pool, sid, invite_id, invite_uses)
+            await add_new_invite(pool, sid, invite_id, max_uses, inviter_id, created_at, invite_uses)
         else:
             await update_invite_uses(pool, sid, invite_id, invite_uses)
 
 
-async def add_new_invite(pool, sid: int, invite_id: str, invite_uses: int = 0):
+async def add_new_invite(pool, sid: int, invite_id: str, max_uses: int, inviter_id: str, created_at: datetime, invite_uses: int = 0):
+    ts = math.floor(created_at.timestamp()) if created_at is not None else None
     async with pool.acquire() as conn:
-        await conn.execute("INSERT INTO invites(server_id, invite_id, uses) VALUES($1, $2, $3)", sid, invite_id, invite_uses)
+        await conn.execute("INSERT INTO invites(server_id, invite_id, uses, max_uses, inviter_id, created_ts) VALUES($1, $2, $3, $4, $5, $6)", sid, invite_id, invite_uses, max_uses, inviter_id, ts)
 
 
 async def update_invite_uses(pool, sid: int, invite_id: str, invite_uses: int):
@@ -277,6 +278,16 @@ class StoredInvite:
     invite_name: Optional[str] = None
     invite_desc: Optional[str] = None
     actual_invite: Optional[Invite] = None
+    max_uses: Optional[int] = None
+    inviter_id: Optional[str] = None
+    created_ts: Optional[int] = None
+
+    def created_at(self) -> Optional[datetime]:
+        """Get the time (if any) that this invite was created."""
+        if self.created_ts is None:
+            return None
+        ts = datetime.fromtimestamp(self.created_ts)
+        return ts
 
 
 @dataclass
@@ -497,6 +508,9 @@ async def create_tables(pool):
 
         # Create invites table
         # Will need to execute "ALTER TABLE invites ADD UNIQUE (server_id, invite_id)" to alter the existing production table
+        # ALTER TABLE invites ADD COLUMN max_uses BIGINT DEFAULT NULL;
+        # ALTER TABLE invites ADD COLUMN inviter_id BIGINT DEFAULT NULL;
+        # ALTER TABLE invites ADD COLUMN created_ts BIGINT DEFAULT NULL;
         await conn.execute('''
                           CREATE TABLE if not exists invites(
                               id            SERIAL PRIMARY KEY,
@@ -505,6 +519,9 @@ async def create_tables(pool):
                               uses          INTEGER NOT NULL DEFAULT 0,
                               invite_name   TEXT,
                               invite_desc   TEXT,
+                              max_uses      INT DEFAULT NULL,
+                              inviter_id    BIGINT DEFAULT NULL,
+                              created_ts    BIGINT DEFAULT NULL,
                               UNIQUE (server_id, invite_id)
                           )
                       ''')

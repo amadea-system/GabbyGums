@@ -204,6 +204,13 @@ def member_join(member: discord.Member, invite: Optional[StoredInvite], pk_info:
 
             embed.add_field(name="Created on",
                             value=invite.actual_invite.created_at.strftime("%b %d, %Y, %I:%M:%S %p UTC"))
+        else:
+            embed.add_field(name="Uses", value="{}".format(invite.uses))
+            if invite.inviter_id is not None:
+                embed.add_field(name="Created By", value="<@{}>".format(invite.inviter_id))
+            if invite.created_ts is not None:
+                embed.add_field(name="Created on", value=invite.created_at().strftime("%b %d, %Y, %I:%M:%S %p UTC"))
+
     else:
         if not manage_guild:
             embed.add_field(name="Permissions Warning!",
@@ -213,8 +220,9 @@ def member_join(member: discord.Member, invite: Optional[StoredInvite], pk_info:
             embed.add_field(name="Code", value="Bot OAuth Link")
         else:
             embed.add_field(name="__**Invite Information**__",
-                            value="Unable to determine invite information. It's likely the invite was a one time use invite."
-                                  " You may be able to determine the inviter by using the Audit Log.", inline=False)
+                            value="Unable to determine invite information. It's possible the invite was a one time use invite."
+                                  " You may be able to determine the inviter by using the Audit Log.\n"
+                                  "Additionally, you can greatly improve the reliability of invite tracking by giving Gabby Gums the **Manage Channels** permission.", inline=False)
 
     embed.set_footer(text="User ID: {}".format(member.id))
 

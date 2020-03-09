@@ -190,11 +190,12 @@ class MemberJoinLeave(commands.Cog):
                 invites: List[discord.Invite] = await guild.invites()
 
             for invite in invites:
-                await db.store_invite(self.bot.db_pool, guild.id, invite.id, invite.uses)
+                await db.store_invite(self.bot.db_pool, guild.id, invite.id, invite.uses, invite.max_uses, invite.inviter.id, invite.created_at)
 
             if stored_invites is None:
                 stored_invites = await self.get_stored_invites(guild.id)
 
+            await asyncio.sleep(1)  # Wait a sec before deleting any invites in case an on_invite_delete fired right after this to allow it to grab the invite cache.
             await self.remove_invalid_invites(guild.id, invites, stored_invites)
         except discord.Forbidden as e:
             logging.exception("update_invite_cache error: {}".format(e))
@@ -223,7 +224,6 @@ class MemberJoinLeave(commands.Cog):
 
     async def find_used_invite(self, member: discord.Member) -> Optional[db.StoredInvite]:
 
-        await asyncio.sleep(3)
         stored_invites: db.StoredInvites = await self.get_stored_invites(member.guild.id)
         current_invites: List[discord.Invite] = await member.guild.invites()
 
@@ -248,6 +248,7 @@ class MemberJoinLeave(commands.Cog):
                 else:
                     pass  # not the used invite. look at the next invite.
         # We scanned through all the current invites and was unable to find a match from the cache. Look through new invites
+        log.info("Invite was not found in current_invites")
 
         for new_invite in new_invites:
             if new_invite.uses > 0:
@@ -256,6 +257,18 @@ class MemberJoinLeave(commands.Cog):
                                               uses=new_invite.uses, invite_name="New Invite!", actual_invite=new_invite)
                 await self.update_invite_cache(member.guild, invites=current_invites)
                 return invite_used
+        log.info("Invite was not found in new_invites\n searching throuch cache for deleted invites.")
+
+        # At this point, it could be a deleted invite.
+        for stored_invite in stored_invites.invites:
+            log.info(f"Checking if {stored_invite.invite_id} was the used invite.")
+            found_invite = discord.utils.get(current_invites, id=stored_invite.invite_id)
+            if found_invite is None:
+                log.info(f"{stored_invite.invite_id} IS the used invite.")
+                # We have a stored invite that no longer exists according to Discord. THis is probably the invite used.
+                stored_invite.uses += 1
+                await self.update_invite_cache(member.guild, invites=current_invites)
+                return stored_invite
 
         # Somehow we STILL haven't found the invite that was used... I don't think we should ever get here, unless I forgot something...
         # We should never get here, so log it very verbosly in case we do so I can avoid it in the future.
