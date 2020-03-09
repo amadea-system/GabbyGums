@@ -8,10 +8,13 @@ Function abilities include:
 Part of the Gabby Gums Discord Logger.
 """
 
-import textwrap
-from typing import Union, Optional, Dict, List
 import logging
+import textwrap
+import traceback
+import sys
+
 from datetime import datetime, timedelta
+from typing import Union, Optional, Dict, List
 
 import discord
 from discord.ext import commands
@@ -26,14 +29,14 @@ async def send_long_msg(channel: [discord.TextChannel, commands.Context], messag
     if code_block:
         if len(code_block_lang) > 0:
             code_block_lang = code_block_lang + "\n"
-        code_block_start = "```" + code_block_lang
+        code_block_start = f"```{code_block_lang}"
         code_block_end = "```"
         code_block_extra_length = len(code_block_start) + len(code_block_end)
-        chunks = textwrap.wrap(message, width=2000 - code_block_extra_length)
+        chunks = split_text(message, max_size=2000 - code_block_extra_length)
         message_chunks = [code_block_start + chunk + code_block_end for chunk in chunks]
 
     else:
-        message_chunks = textwrap.wrap(message, width=2000)
+        message_chunks = split_text(message, max_size=2000)
 
     for chunk in message_chunks:
         await channel.send(chunk)
@@ -57,7 +60,7 @@ def split_text(text: Union[str, List], max_size: int = 2000, delimiter: str = "\
     for fragment in text:
         fragment_length = len(fragment) + delim_length
         if fragment_length > max_size:
-            raise ValueError("A single line exceeded the max length. Can not split!")
+            raise ValueError("A single line exceeded the max length. Can not split!")  # TODO: Find a better way than throwing an error.
         if count + fragment_length > max_size:
             output.append(tmp_str)
             tmp_str = ""
@@ -71,7 +74,7 @@ def split_text(text: Union[str, List], max_size: int = 2000, delimiter: str = "\
     return output
 
 
-async def send_error_msg_to_log(bot: GGBot, error_messages: Optional[Union[str, List[str]]], header: Optional[str] = None, code_block: bool = False,) -> bool:
+async def log_error_msg(bot: GGBot, error_messages: Optional[Union[str, List[str], Exception]], header: Optional[str] = None, code_block: bool = False) -> bool:
     """
     Attempts to send a message to the Global Error Discord Channel.
 
@@ -94,6 +97,9 @@ async def send_error_msg_to_log(bot: GGBot, error_messages: Optional[Union[str, 
             return True  # Should this be True? False isn't really accurate either....
         # Convert it into a single string.
         error_messages = "\n".join(error_messages)
+    elif isinstance(error_messages, Exception):
+        error_messages = full_stack()
+        code_block = True  # Override code block for exceptions.
     else:
         if error_messages == "":  # Empty
             return True  # Should this be True? False isn't really accurate either....
@@ -113,6 +119,20 @@ async def send_error_msg_to_log(bot: GGBot, error_messages: Optional[Union[str, 
     except discord.DiscordException as e:
         log.exception(f"Error sending log to Global Error Discord Channel!: {e}")
         return False
+
+
+def full_stack():
+    exc = sys.exc_info()[0]
+    if exc is not None:
+        f = sys.exc_info()[-1].tb_frame.f_back
+        stack = traceback.extract_stack(f, limit=5)
+    else:
+        stack = traceback.extract_stack(limit=5)[:-1]  # last one would be full_stack()
+    trc = 'Traceback (most recent call last):\n'
+    stackstr = trc + ''.join(traceback.format_list(stack))
+    if exc is not None:
+        stackstr += '  ' + traceback.format_exc().lstrip(trc)
+    return stackstr
 
 
 class MissingAuditLogPermissions(Exception):
