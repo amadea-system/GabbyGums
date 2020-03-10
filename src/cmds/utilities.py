@@ -62,8 +62,63 @@ class Utilities(commands.Cog):
                 manage_channels=True    # Required for invite events and improved accuracy of invite tracking.
             )
 
-        link = discord.utils.oauth_url(self.bot.user.id, permissions=perm)
-        await ctx.send(f"Here's a link to invite Gabby Gums to your server:\n{link}")
+            link = discord.utils.oauth_url(self.bot.user.id, permissions=perm)
+            await ctx.send(f"Here's a link to invite Gabby Gums to your server:\n{link}\n\n"
+                           f"If you would like to see a breakdown of why Gabby Gums needs the requested permissions to operate properly, you can use the command `{ctx.bot.command_prefix}invite explain`")
+
+    @invite_link.command(name='explain', brief="Explains why Gabby Gums needs the permissions requested.")
+    async def invite_link_explain(self, ctx: commands.Context):
+        embed = discord.Embed(title="Breakdown Of Requested Permissions",
+                              description="Here is a breakdown of all the permissions Gabby Gums asks for and why.\n"
+                                          "If you have any additional questions regarding these permissions, feel free to stop by our support server: https://discord.gg/3Ugade9\n",
+                              color=discord.Color.from_rgb(80, 135, 135))
+
+        embed.add_field(name="Manage Guild (Optional, Required for Invite Tracking)",
+                        value="The Manage Guild permission is needed for seeing the invites that exist on your server and how many times they have been used.\n"
+                              "This information is required for determining which invite a user used when they join your server.",
+                        inline=False)
+
+        embed.add_field(name="Manage Channels (Optional, Strongly recommended for Invite Tracking)",
+                        value="The Manage Channels permission is needed to log the *Invite Create* and *Invite Delete* events.\n"
+                              "Additionally, it __greatly__ helps with determining which invite a joining user used and is **strongly** recommended if you intend on using invite tracking.",
+                        inline=False)
+
+        embed.add_field(name="View Audit Log (Optional, Required for determining who did what and kick events.)",
+                        value="The View Audit Log permission is needed to determine if a user left or was kicked.\n"
+                              "It is also needed to determine who preformed an action that is being logged (e.g. Who Banned or Unbanned a user.)",
+                        inline=False)
+
+        embed.add_field(name="Attach Files (Optional, Required for Archive command and Bulk Delete Event)",
+                        value="The Attach Files permission is needed to attach the archive files generated from the *Bulk Delete* event and the *Archive* command.",
+                        inline=False)
+
+        embed.add_field(name="Read Messages (Required)",
+                        value="The Read Messages permission is required so that Gabby Gums can do pretty much anything at all.",
+                        inline=False)
+
+        embed.add_field(name="Embed Links (Required)",
+                        value="The Embed Links permission is required to send Embeds (Like the one this explination is in).\n"
+                              "Without it, no logs can be sent and most commands will not be operational.",
+                        inline=False)
+
+        embed.add_field(name="Send Messages (Required)",
+                        value="The Send Messages permission is required to send any logs and to respond to any commands.\n",
+                        inline=False)
+
+        embed.add_field(name="Use External Emojis (Required)",
+                        value="The Use External Emojis permission is required as some logs use external emojis in them.",
+                        inline=False)
+
+        embed.add_field(name="Add Reactions (Required)",
+                        value="The Add Reactions permission is required for the reaction based menu system that some commands of use.",
+                        inline=False)
+
+        embed.add_field(name="Read Message History (Mostly Required)",
+                        value="The Read Message History permission is required for the reaction based menu system in some cases.\n"
+                              "Additionally, it is also needed for the *Archive* command to function.",
+                        inline=False)
+        await ctx.send(embed=embed)
+    # endregion
 
 
     @commands.guild_only()
