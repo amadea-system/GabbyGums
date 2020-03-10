@@ -14,8 +14,8 @@ import discord
 from discord.ext import commands
 
 import db
-import miscUtils
-from uiElements import StringPage, StringReactPage, Page
+# import miscUtils
+from uiElements import StringReactPage, BoolPage
 from GuildConfigs import GuildLoggingConfig, EventConfig, GuildConfigDocs
 
 if TYPE_CHECKING:
@@ -113,14 +113,10 @@ class Configuration(commands.Cog):
             await ctx.send("⚠ {}".format(error))
             raise error
 
-    @commands.is_owner()
-    @commands.guild_only()
-    @commands.command(brief="Owner only test command")
-    async def configtest(self, ctx: commands.Context):
-        await ctx.send(f"hello from {__name__}")
-
 
     # region Event Configuration Menu System
+
+
     @commands.has_permissions(manage_messages=True)
     @commands.max_concurrency(1, per=commands.BucketType.member, wait=False)
     @commands.guild_only()
@@ -239,6 +235,39 @@ class Configuration(commands.Cog):
 
     async def edit_event(self, guild: discord.Guild, new_configs: GuildLoggingConfig):
         await db.set_server_log_configs(self.bot.db_pool, guild.id, new_configs)
+    # endregion
+
+    # region Reset Command
+
+    @commands.has_permissions(manage_messages=True)
+    @commands.guild_only()
+    @commands.command(name="reset",
+                      brief="Resets all settings and stored data for your server.",
+                      description="Resets all settings and stored data for your server. **Caution, this can not be undone!**")
+    async def reset_server_info(self, ctx: commands.Context):
+
+        conf_embed = discord.Embed(title="**Are You Sure?**",
+                                   description="This will **completely** wipe all data relating to this server from the Gabby Gums Database.\n"
+                                               "This includes information on banned Plural Kit system accounts, all cached messages (in the database), "
+                                               "and all configured settings such as Log channels, enabled/disabled events, ignored users/channels/categories.\n\n"
+                                               "This action **can not** be undone and you will have to reset up Gabby Gums from the beginning.\n\n"
+                                               "Click the ✅ to continue\nclick the ❌ to cancel.",
+                                   color=discord.Color.from_rgb(80, 135, 135))
+        conf_page = BoolPage(embed=conf_embed)
+
+        confirmation = await conf_page.run(ctx)
+
+        if confirmation is None:
+            await ctx.send("❌ Command Timed Out! Settings have **not** been reset.")
+
+        elif confirmation is False:
+            await ctx.send("❌ Command Canceled. Settings have **not** been reset.")
+
+        elif confirmation is True:
+            await db.remove_server(self.bot.db_pool, ctx.guild.id)
+            await db.add_server(self.bot.db_pool, ctx.guild.id, ctx.guild.name)
+            await ctx.send("✅ **ALL settings have now been reset!**\nTo continue using Gabby Gums, please begin re-setting up the bot.")
+
     # endregion
 
 

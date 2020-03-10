@@ -521,3 +521,80 @@ class StringReactPage(Page):
 
         except Exception:
             pass
+
+
+class BoolPage(Page):
+
+    def __init__(self, name: Optional[str] = None, body: Optional[str] = None,
+                 callback: Callable = do_nothing, additional: str = None, embed: Optional[discord.Embed] = None, previous_msg: Optional[Union[discord.Message, PageResponse]] = None, timeout: int = 120.0):
+        """
+        Callback signature: page: reactMenu.Page, _client: commands.Bot, ctx: commands.Context, response: bool
+        """
+        self.ctx = None
+        self.match = None
+        self.canceled = False
+
+        super().__init__(page_type="n/a", name=name, body=body, callback=callback, additional=additional, embed=embed, previous_msg=previous_msg, timeout=timeout)
+
+    async def run(self, ctx: commands.Context):
+        """
+        Callback signature: page: reactMenu.Page, _client: commands.Bot, ctx: commands.Context, response: bool
+        """
+        self.ctx = ctx
+        channel: discord.TextChannel = ctx.channel
+        author: discord.Member = ctx.author
+        message: discord.Message = ctx.message
+
+        if self.embed is None:
+            self.page_message = await channel.send(self.construct_std_page_msg())
+        else:
+            self.page_message = await channel.send(self.construct_std_page_msg(), embed=self.embed)
+
+        try:
+            await self.page_message.add_reaction("✅")
+            await self.page_message.add_reaction("❌")
+        except discord.Forbidden as e:
+            await ctx.send(
+                f"CRITICAL ERROR!!! \n{ctx.guild.me.name} does not have the `Add Reactions` permissions!. Please have an Admin fix this issue and try again.")
+            raise e
+
+
+        def react_check(_reaction: discord.Reaction, _user):
+            self.LOG.info("Checking Reaction: Reacted Message: {}, orig message: {}".format(_reaction.message.id,
+                                                                                            self.page_message.id))
+
+            return _user == ctx.author and (str(_reaction.emoji) == '✅' or str(_reaction.emoji) == '❌')
+
+
+        try:
+            reaction, react_user = await self.ctx.bot.wait_for('reaction_add', timeout=self.timeout, check=react_check)
+            if str(reaction.emoji) == '✅':
+                self.response = True
+                await self.remove()
+                await self.callback(self, self.ctx.bot, ctx, True)
+                return True
+            elif str(reaction.emoji) == '❌':
+                self.response = False
+                await self.remove()
+                await self.callback(self, self.ctx.bot, ctx, False)
+                return False
+
+        except asyncio.TimeoutError:
+            await self.remove()
+            return None
+
+
+    # def react_check(self, payload):
+    #     """Uses raw_reaction_add"""
+    #
+    #     if payload.user_id != self.ctx.author.id:
+    #         return False
+    #
+    #     if payload.message_id != self.page_message.id:
+    #         return False
+    #
+    #     if "❌" == str(payload.emoji):
+    #         self.canceled = True
+    #         return True
+    #
+    #     return False

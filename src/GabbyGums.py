@@ -277,19 +277,7 @@ async def remove_category(ctx: commands.Context, *, category: discord.CategoryCh
     await ctx.send("<#{}> is no longer being ignored.".format(category.id))
 
 
-# ----- Data management commands ----- #
 
-
-@commands.has_permissions(manage_messages=True)
-@commands.guild_only()
-@client.group(name="reset",
-              brief="**Completely resets** all configuration and stored data for your server. **Caution, this can not be undone!**")
-async def reset_server_info(ctx: commands.Context):
-    # TODO: Add warning and confirmation
-    bot: GGBot = ctx.bot
-    await db.remove_server(bot.db_pool, ctx.guild.id)
-    await db.add_server(bot.db_pool, ctx.guild.id, ctx.guild.name)
-    await ctx.send("**ALL Settings have been reset!**")
 
 
 
