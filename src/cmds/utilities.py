@@ -134,6 +134,7 @@ class Utilities(commands.Cog):
 
         await ctx.send(embed=embed)
 
+    # region Verbose Permissions Verification Command
     @commands.command(name="verbose_perm",
                       brief="Shows all posible permission problems.",
                       description="Shows all posible permission problems.",
@@ -350,15 +351,17 @@ class Utilities(commands.Cog):
             embed.description = "No problems found!"
 
         await ctx.send(embed=embed)
+    # endregion
 
-
+    # region Permissions Verification Command
     @commands.command(name="permissions",
                       aliases=["verify_permissions", "perm", "permissions_check", "perm_check", "verify_perm"],
                       brief="Checks for any permissions or configuration problems.",
                       description="Checks for any possible permission or configuration problems that could interfere with the operations of Gabby Gums",
                       )
     async def verify_permissions(self, ctx: commands.Context, guild_id: Optional[str] = None):
-        # TODO: Restrict usage
+
+        # Current number of fields:  Perm: 8/25, Conf: 5/25
 
         if guild_id is not None:
             guild: discord.Guild = self.bot.get_guild(int(guild_id.strip()))
@@ -372,19 +375,22 @@ class Utilities(commands.Cog):
                 await ctx.send("{} is an invalid guild ID".format(guild_id))
             return
 
-
         # ToDO: check for send permissions for ctx and log error if unavailable.
-        embed = discord.Embed(title="Debug for {}".format(guild.name), color=0x61cd72)
+        perm_embed = discord.Embed(title="Permissions Debug for {}".format(guild.name), color=0x61cd72)
 
-        perms = {'read': [], 'send': [], 'non-crit': [], 'manage_guild': True, 'audit_log': True,
-                 'embed_links': [], 'external_emojis': [], 'add_reactions': [], "read_msg_history": [],
-                 'attach_files': []}
+        perms = {'read': [], 'send': [], 'non-crit': [], 'embed_links': [], 'external_emojis': [],
+                 'add_reactions': [], "read_msg_history": [], 'attach_files': [],
+                 'manage_guild': True, 'audit_log': True, 'manage_channels': True}
+
         errors_found = False
 
         guild_logging_channel = await self.bot.get_event_or_guild_logging_channel(guild.id)
         event_configs = await db.get_server_log_configs(self.bot.db_pool, guild.id)
+
         msg_del_ch = await self.bot.get_event_or_guild_logging_channel(guild.id, 'message_delete')
         ch_update_ch = await self.bot.get_event_or_guild_logging_channel(guild.id, 'channel_update')
+        # invite_create_ch = await self.bot.get_event_or_guild_logging_channel(guild.id, 'invite_create')
+        # invite_delete_ch = await self.bot.get_event_or_guild_logging_channel(guild.id, 'invite_delete')
 
         if not guild.me.guild_permissions.manage_guild:
             errors_found = True
@@ -393,6 +399,10 @@ class Utilities(commands.Cog):
         if not guild.me.guild_permissions.view_audit_log:
             errors_found = True
             perms['audit_log'] = False
+
+        if not guild.me.guild_permissions.manage_channels:
+            errors_found = True
+            perms['manage_channels'] = False
 
         for channel in guild.channels:
             channel: discord.TextChannel
@@ -418,7 +428,7 @@ class Utilities(commands.Cog):
                         errors_found = True
                         perms["external_emojis"].append(f"<#{channel.id}>")
 
-                if permissions.attach_files is False:  # Needed for Bulk Delete logs andthe archive command
+                if permissions.attach_files is False:  # Needed for Bulk Delete logs and the archive command
                     if msg_del_ch is not None and channel.id == msg_del_ch.id:
                         errors_found = True
                         perms["attach_files"].append(f"<#{channel.id}>")
@@ -427,58 +437,72 @@ class Utilities(commands.Cog):
             send_msg = "\N{Warning Sign} CRITICAL ERROR!! The following channels are configured as logging channels but are missing the **Send Messages** permission.\n" \
                        "As such, no logs will be able to be sent in the following log channels:\n"
             send_msg = send_msg + "\n".join(perms['send'])
-            embed.add_field(name="Missing Send Messages Permissions in Logging Channels", value=f"{send_msg}\n\N{ZERO WIDTH NON-JOINER}",
-                            inline=False)
+            perm_embed.add_field(name="Missing Send Messages Permissions in Logging Channels", value=f"{send_msg}\n\N{ZERO WIDTH NON-JOINER}",
+                                 inline=False)
 
         if len(perms['embed_links']) > 0:
             send_msg = "\N{Warning Sign} CRITICAL ERROR!! The following channels are configured as logging channels but are missing the **Embed Links** permission.\n" \
                        "As such, no logs will be able to be sent in the following log channels:\n"
             send_msg = send_msg + "\n".join(perms['embed_links'])
-            embed.add_field(name="Missing Embed Links Permission in Logging Channels", value=f"{send_msg}\n\N{ZERO WIDTH NON-JOINER}",
-                            inline=False)
+            perm_embed.add_field(name="Missing Embed Links Permission in Logging Channels", value=f"{send_msg}\n\N{ZERO WIDTH NON-JOINER}",
+                                 inline=False)
 
         if len(perms['external_emojis']) > 0:
             send_msg = "\N{Warning Sign} CRITICAL ERROR!! The channel configured for the **channel_update** event is missing the **Use External Emojis** permission.\n" \
                        "Without this permission, some log times may not be able to be logged in the following log channels:\n"
             send_msg = send_msg + "\n".join(perms['external_emojis'])
-            embed.add_field(name="Missing Use External Emojis Permission in Logging Channels",
-                            value=f"{send_msg}\n\N{ZERO WIDTH NON-JOINER}",
-                            inline=False)
+            perm_embed.add_field(name="Missing Use External Emojis Permission in Logging Channels",
+                                 value=f"{send_msg}\n\N{ZERO WIDTH NON-JOINER}",
+                                 inline=False)
 
         if len(perms['attach_files']) > 0:
             send_msg = "\N{Warning Sign} CRITICAL ERROR!! The channel configured for the **message_delete** event is missing the **Attach Files** permission.\n" \
                        "As such, Bulk Message Deletes will not be able to be logged:\n"
             send_msg = send_msg + "\n".join(perms['attach_files'])
-            embed.add_field(name="Missing Attach Files Permission", value=f"{send_msg}\n\N{ZERO WIDTH NON-JOINER}",
-                            inline=False)
+            perm_embed.add_field(name="Missing Attach Files Permission", value=f"{send_msg}\n\N{ZERO WIDTH NON-JOINER}",
+                                 inline=False)
 
         if not perms['manage_guild']:
-            embed.add_field(name="Manage Server Permissions Problems",
-                            value="Gabby Gums is missing the Manage Server permission. Invite code tracking will not be functional.",
-                            inline=False)
+            perm_embed.add_field(name="Manage Server Permissions Problems",
+                                 value="Gabby Gums is missing the **Manage Server** permission. Invite code tracking will not be functional.",
+                                 inline=False)
+
+        if not perms['manage_channels']:
+            perm_embed.add_field(name="Manage Channels Permissions Problems",
+                                 value="Gabby Gums is missing the **Manage Channels** permission.\nGabby Gums will have a much harder time determining which invite was used by users joining this server.\n"
+                                  "Additionally, this will prevent Gabby Gums from logging the Invite Create and Invite Delete events.",
+                                 inline=False)
 
         if not perms['audit_log']:
-            embed.add_field(name="Missing View Audit Log Permissions",
-                            value="Gabby Gums is missing the View Audit Log permission. This will prevent Gabby Gums from logging kick events and determining who did the following events: Member Ban & Unban, Channel Create, Channel Delete, Channel Update.",
-                            inline=False)
+            perm_embed.add_field(name="Missing View Audit Log Permissions",
+                                 value="Gabby Gums is missing the **View Audit Log** permission. This will prevent Gabby Gums from logging kick events and determining who did the following events: Member Ban & Unban, Channel Create, Channel Delete, Channel Update.",
+                                 inline=False)
 
         if len(perms['read']) > 0:
             read_msg = "ERROR!! The following channels do not have the **Read Messages** permission.\n" \
                        "Gabby Gums will be unable to log any events that happen in these channels:\n"
             read_msg = read_msg + "\n".join(perms['read'])
-            embed.add_field(name="Read Messages Permissions Problems", value=f"{read_msg}\n\N{ZERO WIDTH NON-JOINER}",
-                            inline=False)
+            perm_embed.add_field(name="Read Messages Permissions Problems", value=f"{read_msg}\n\N{ZERO WIDTH NON-JOINER}",
+                                 inline=False)
 
+        # Set the appropriate embed description
+        if errors_found:
+            perm_embed.description = "Uh oh! Problems were found!"
+        else:
+            perm_embed.description = "No problems found!"
+
+        # -- Now create another embed that lists out the current guild configs -- #
+        conf_embed = discord.Embed(title=f"Configuration Debug for {guild.name}", color=0x61cd72)
         # List the default log channel
 
         if guild_logging_channel is not None:
-            embed.add_field(name="Default Log Channel ",
-                            value="<#{}>\n\N{ZERO WIDTH NON-JOINER}".format(guild_logging_channel.id), inline=True)
+            conf_embed.add_field(name="Default Log Channel ",
+                                 value="<#{}>\n\N{ZERO WIDTH NON-JOINER}".format(guild_logging_channel.id), inline=True)
             default_log_channel = f"<#{guild_logging_channel.id}>"
         else:
-            embed.add_field(name="Default Log Channel ",
-                            value="**NONE**\n(This is not recommended. Please setup a default logging channel)\n\N{ZERO WIDTH NON-JOINER}",
-                            inline=True)
+            conf_embed.add_field(name="Default Log Channel ",
+                                 value="**NONE**\n(This is not recommended. Please setup a default logging channel)\n\N{ZERO WIDTH NON-JOINER}",
+                                 inline=True)
             default_log_channel = "**NONE**"
 
         # List event specific logging configs
@@ -493,8 +517,8 @@ class Utilities(commands.Cog):
                 event_config_msg_fragments.append(f"__{event_type}:__\nLogging to <#{event.log_channel_id}>")
 
         event_config_msg = "\n".join(event_config_msg_fragments)
-        embed.add_field(name="Event Configurations", value=f"{event_config_msg}\n\N{ZERO WIDTH NON-JOINER}",
-                        inline=True)
+        conf_embed.add_field(name="Event Configurations", value=f"{event_config_msg}\n\N{ZERO WIDTH NON-JOINER}",
+                             inline=True)
 
         # List all users being ignored
         ignored_users_msg_fragments = []
@@ -503,9 +527,9 @@ class Utilities(commands.Cog):
             for user_id in ignored_users_ids:
                 ignored_users_msg_fragments.append(f"<@!{user_id}>")
             ignored_users_msg = "\n".join(ignored_users_msg_fragments)
-            embed.add_field(name="Users Currently Being Ignored ",
-                            value=f"{ignored_users_msg}\n\N{ZERO WIDTH NON-JOINER}",
-                            inline=True)
+            conf_embed.add_field(name="Users Currently Being Ignored ",
+                                 value=f"{ignored_users_msg}\n\N{ZERO WIDTH NON-JOINER}",
+                                 inline=True)
 
         # List all channels being ignored
         channels_msg = ""
@@ -517,11 +541,11 @@ class Utilities(commands.Cog):
                     channels_msg = channels_msg + "<#{}>\n".format(ignored_channel.id)
                 else:
                     channels_msg = channels_msg + "Deleted channel w/ ID: {}\n".format(channel_id)
-            embed.add_field(name="Channels Currently Being Ignored ", value=f"{channels_msg}\N{ZERO WIDTH NON-JOINER}",
-                            inline=True)
+            conf_embed.add_field(name="Channels Currently Being Ignored ", value=f"{channels_msg}\N{ZERO WIDTH NON-JOINER}",
+                                 inline=True)
         else:
-            embed.add_field(name="Channels Currently Being Ignored ", value="**NONE**\n\N{ZERO WIDTH NON-JOINER}",
-                            inline=True)
+            conf_embed.add_field(name="Channels Currently Being Ignored ", value="**NONE**\n\N{ZERO WIDTH NON-JOINER}",
+                                 inline=True)
 
         # List all categories being ignored
         _ignored_categories = await db.get_ignored_categories(self.bot.db_pool, guild.id)
@@ -529,20 +553,19 @@ class Utilities(commands.Cog):
             categories_id_msg_fragments = [f"<#{category_id}>  *(ID: {category_id})*" for category_id in
                                            _ignored_categories]
             categories_msg = "\n".join(categories_id_msg_fragments)
-            embed.add_field(name="All channels under the following categories are currently being ignored ",
-                            value=f"{categories_msg}\n\N{ZERO WIDTH NON-JOINER}", inline=True)
+            conf_embed.add_field(name="All channels under the following categories are currently being ignored ",
+                                 value=f"{categories_msg}\n\N{ZERO WIDTH NON-JOINER}", inline=True)
         else:
-            embed.add_field(name="All channels under the following categories are currently being ignored ",
-                            value="**NONE**\n\N{ZERO WIDTH NON-JOINER}", inline=True)
+            conf_embed.add_field(name="All channels under the following categories are currently being ignored ",
+                                 value="**NONE**\n\N{ZERO WIDTH NON-JOINER}", inline=True)
 
-        # Set the appropriate embed description
-        if errors_found:
-            embed.description = "Uh oh! Problems were found!"
-        else:
-            embed.description = "No problems found!"
+        # conf_embed.description = "\N{ZERO WIDTH NON-JOINER}\n\N{ZERO WIDTH NON-JOINER}"
 
-        await ctx.send(embed=embed)
+        await ctx.send(embed=perm_embed)
+        await ctx.send(embed=conf_embed)
+    # endregion
 
+    # region DB Performance Statistics Command
     @commands.cooldown(rate=1, per=10, type=commands.BucketType.default)
     @commands.command(aliases=["db_stats", "db_performance"],
                       brief="Shows various time stats for the database.",)
@@ -570,6 +593,7 @@ class Utilities(commands.Cog):
         page = FieldPages(ctx, entries=embed_entries, per_page=15)
         page.embed.title = f"DB Statistics:"
         await page.paginate()
+    # endregion
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
