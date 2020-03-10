@@ -305,9 +305,13 @@ class MemberJoinLeave(commands.Cog):
             try_again_invite_debug_msg = try_again_invite_debug_msg + debug_msg
             try_again_invite_debug_msg = try_again_invite_debug_msg + "]"
 
+        # Check to see if they are receiving Invite Create/Delete events.
+        permissions: discord.Permissions = member.guild.me.guild_permissions
+        manage_ch_perm = permissions.manage_channels
+        invite_events_msg = "✅ GG is receiving Invite Events." if manage_ch_perm else "❌ GG is **NOT** receiving Invite Events. Invite tracking will not be as accurate."
         if 'error_log_channel' in self.bot.config:
             error_log_channel = self.bot.get_channel(self.bot.config['error_log_channel'])
-            await error_log_channel.send("UNABLE TO DETERMINE INVITE USED.")
+            await error_log_channel.send(f"UNABLE TO DETERMINE INVITE USED.\n{invite_events_msg}")
             await send_long_msg(error_log_channel, "Stored invites: {}".format(stored_invites), code_block=True)
             await send_long_msg(error_log_channel, "Current invites: {}".format(current_invite_debug_msg), code_block=True)
             await send_long_msg(error_log_channel, "2nd_try Current invites: {}".format(try_again_invite_debug_msg), code_block=True)
