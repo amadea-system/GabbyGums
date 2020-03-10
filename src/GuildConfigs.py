@@ -5,7 +5,7 @@ Functions and enums for configuring guild specific settings
 from __future__ import annotations
 
 from dataclasses import dataclass, fields, asdict
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from discord.permissions import Permissions
 
@@ -134,12 +134,13 @@ class GuildLoggingConfig:
 
         return False
 
+
 class EventConfigDocs:
     """Class for holding documentation for an event type"""
-    def __init__(self, brief: str, more: Optional[str] = None, required_permissions: Optional[Permissions] = None):
+    def __init__(self, brief: str, more: Optional[str] = None, required_permissions: Optional[Dict] = None):
         self.brief: str = brief
         self._more: Optional[str] = more
-        self.permissions: Optional[Permissions] = required_permissions
+        self.permissions: Dict = required_permissions if required_permissions is not None else {}
 
 
     def __str__(self):
@@ -166,15 +167,15 @@ class GuildConfigDocs:
     member_leave = EventConfigDocs('''Logs when a member leaves your server.''')
     member_ban = EventConfigDocs("Logs when a member gets banned from your server.", "(Requires the `View Audit Log` permission ONLY to determine the moderator that did the banning and the reason)")
     member_unban = EventConfigDocs("Logs when a member gets unbanned from your server.", "(Requires the `View Audit Log` permission ONLY to determine the moderator that did the unbanning and the reason)")
-    member_kick = EventConfigDocs("Logs when a member gets kicked from your server.", "(Requires the `View Audit Log` permission to work)", Permissions(view_audit_log=True))
+    member_kick = EventConfigDocs("Logs when a member gets kicked from your server.", "(Requires the `View Audit Log` permission to work)", {'view_audit_log': True})
     member_avatar_change = EventConfigDocs("Logs when a member changes their avatar. (Off by default)")
     guild_member_nickname = EventConfigDocs("Logs when a member changes their server nickname.")
     username_change = EventConfigDocs("Logs when a member changes their Discord username or discriminator.")
     channel_create = EventConfigDocs("Logs when a channel is created in your server.")
     channel_delete = EventConfigDocs("Logs when a channel is deleted in your server.")
-    channel_update = EventConfigDocs("Logs when a channel is changed in your server.\n(Position changes and person who created/updated/deleted channel coming soon!)")
-    invite_create: EventConfig = EventConfigDocs("Logs when an invite is created in your server.", "(Requires the 'Manage Channels' permission to work)", Permissions(manage_channels=True))
-    invite_delete: EventConfig = EventConfigDocs("Logs when an invite is deleted in your server.", "(Requires the 'Manage Channels' permission to work)", Permissions(manage_channels=True))
+    channel_update = EventConfigDocs("Logs when a channel is changed in your server.\n(Position changes and person who created/updated/deleted channel coming soon!)", required_permissions={'external_emojis': True})
+    invite_create: EventConfig = EventConfigDocs("Logs when an invite is created in your server.", "(Requires the 'Manage Channels' permission to work)", {'manage_channels': True})
+    invite_delete: EventConfig = EventConfigDocs("Logs when an invite is deleted in your server.", "(Requires the 'Manage Channels' permission to work)", {'manage_channels': True})
 
 
     def __getitem__(self, item):

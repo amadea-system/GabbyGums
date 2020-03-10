@@ -9,9 +9,10 @@ Part of the Gabby Gums Discord Logger.
 """
 
 import logging
-import textwrap
+import copy
 import traceback
 import sys
+import string
 
 from datetime import datetime, timedelta
 from typing import Union, Optional, Dict, List
@@ -162,3 +163,10 @@ async def get_audit_logs(guild: discord.Guild, audit_action: discord.AuditLogAct
         return audit_log_entries
     else:
         raise MissingAuditLogPermissions
+
+
+def prettify_permission_name(perm_name: str) -> str:
+    pretty_perm_name = string.capwords(f"{perm_name}".replace('_', ' '))  # Capitalize the permission names and replace underlines with spaces.
+    pretty_perm_name = "Send TTS Messages" if pretty_perm_name == "Send Tts Messages" else pretty_perm_name  # Mak sure that we capitalize the TTS acronym properly.
+    return pretty_perm_name
+

@@ -9,7 +9,6 @@ Part of the Gabby Gums Discord Logger.
 """
 
 # import asyncio
-import string
 import logging
 from datetime import datetime
 from typing import TYPE_CHECKING, Union, Optional  # , Dict, List, Tuple, NamedTuple
@@ -17,7 +16,7 @@ from typing import TYPE_CHECKING, Union, Optional  # , Dict, List, Tuple, NamedT
 import discord
 from discord.ext import commands
 
-from miscUtils import split_text
+from miscUtils import split_text, prettify_permission_name
 
 if TYPE_CHECKING:
     from bot import GGBot
@@ -373,8 +372,7 @@ class ChannelEvents(commands.Cog):
                     changes_msg = []
                     for new in changes:
                         old = discord.utils.find(lambda old_set: old_set[0] == new[0], before_set)
-                        perm_name = string.capwords(f"{new[0]}".replace('_', ' '))  # Capitalize the permission names and replace underlines with spaces.
-                        perm_name = "Send TTS Messages" if perm_name == "Send Tts Messages" else perm_name  # Mak sure that we capitalize the TTS acronym properly.
+                        perm_name = prettify_permission_name(new[0])
                         if new[1] is None:
                             perm_status = "Inherit"
                             perm_status_emoji = "<:Inherit:681237607312654345>"

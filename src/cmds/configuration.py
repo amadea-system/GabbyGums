@@ -14,7 +14,7 @@ import discord
 from discord.ext import commands
 
 import db
-# import miscUtils
+from miscUtils import prettify_permission_name
 from uiElements import StringReactPage, BoolPage
 from GuildConfigs import GuildLoggingConfig, EventConfig, GuildConfigDocs
 
@@ -61,7 +61,7 @@ async def get_event_configuration_embed(ctx: commands.Context, event_configs: Gu
     return embed
 
 
-def get_edit_event_embed(event_type_name: str, event_configs: GuildLoggingConfig) -> discord.Embed:
+def get_edit_event_embed(event_type_name: str, event_configs: GuildLoggingConfig, error_message) -> discord.Embed:
     # log.info(event_configs)
     configs: EventConfig = event_configs[event_type_name]
     if configs is None:
@@ -81,6 +81,8 @@ def get_edit_event_embed(event_type_name: str, event_configs: GuildLoggingConfig
 
     embed = discord.Embed(title=f"Current {event_type_name} Configuration:",
                           description=msg)
+    if error_message is not None:
+        embed.add_field(name="\N{ZERO WIDTH SPACE}\n\N{WARNING SIGN} Error \N{WARNING SIGN}", value=error_message)
     return embed
 # endregion
 
@@ -88,6 +90,7 @@ def get_edit_event_embed(event_type_name: str, event_configs: GuildLoggingConfig
 class Configuration(commands.Cog):
     def __init__(self, bot: 'GGBot'):
         self.bot = bot
+        self.default_req_perms = {'read_messages': True, 'send_messages': True, 'embed_links': True}  # Permissions that EVERY channel requires.
 
     async def handle_errors(self, ctx: commands.Context, error: Type[Exception], errors_to_ignore: Tuple[Type[Exception]]):
 
@@ -147,9 +150,10 @@ class Configuration(commands.Cog):
         edit_buttons = [('🔀', 'toggle'), ('<:backbtn:679032730243301397>', 'back')]  # ('🔙', 'back')]  # , ('🛑', 'stop')]
 
         # edit_msg = None
+        error_msg = None
         while True:
-            # last_msg = edit_msg or event_type_rsp.ui_message
-            embed = get_edit_event_embed(event_type_rsp.response, event_configs)
+
+            embed = get_edit_event_embed(event_type_rsp.response, event_configs, error_msg)
             edit_page = StringReactPage(embed=embed, buttons=edit_buttons, allowable_responses=[])
             edit_rsp = await edit_page.run(ctx)
 
@@ -171,15 +175,17 @@ class Configuration(commands.Cog):
                 return
             elif edit_rsp_str == 'toggle':
                 event_configs = await self.toggle_event(ctx, event_type_rsp.response, event_configs)
+                error_msg = None
 
             elif edit_rsp_str == 'clear':
                 event_configs = await self.clear_log_channel(ctx, event_type_rsp.response, event_configs)
+                error_msg = None
 
             else:
                 # Try to get a Valid Channel. If successful, set the log channel, commit changes to the DB, and alert the user.
                 try:
                     log_chan = await commands.TextChannelConverter().convert(ctx, edit_rsp_str)
-                    event_configs = await self.set_log_channel(ctx, log_chan, event_type_rsp.response, event_configs)
+                    event_configs, error_msg = await self.set_log_channel(ctx, log_chan, event_type_rsp.response, event_configs)
                 except commands.BadArgument:
                     await ctx.send('Invalid channel!')
 
@@ -219,19 +225,40 @@ class Configuration(commands.Cog):
         # Return the modified event configs
         return event_configs
 
-    async def set_log_channel(self, ctx: commands.Context, new_log_channel: discord.TextChannel, event_name: str, event_configs: GuildLoggingConfig) -> GuildLoggingConfig:
+    async def set_log_channel(self, ctx: commands.Context, new_log_channel: discord.TextChannel, event_name: str, event_configs: GuildLoggingConfig) -> Tuple[GuildLoggingConfig, Optional[str]]:
         # Clear the log channel, commit changes to the DB, and alert the user.
         config: EventConfig = event_configs[event_name]
         if config is None:
             config = EventConfig()
-        config.log_channel_id = new_log_channel.id
-        event_configs[event_name] = config
-        await self.edit_event(ctx.guild, event_configs)
 
-        await ctx.send(f'**{event_name}** events will now be logged to the **<#{new_log_channel.id}>**')
+        event_perms = guild_config_docs[event_name].permissions
+        ch_perms: discord.Permissions = ctx.guild.me.permissions_in(new_log_channel)
+
+        missing_perms_msg = ""
+        for perm, value in ch_perms:
+            if (perm in self.default_req_perms or perm in event_perms) and not value:
+                if perm == "view_audit_log" or perm == "manage_channels":
+                    missing_perms_msg += f"**{prettify_permission_name(perm)}** (Server Permission)\n"
+                else:
+                    missing_perms_msg += f"**{prettify_permission_name(perm)}**\n"
+
+        if not missing_perms_msg:
+
+            config.log_channel_id = new_log_channel.id
+            event_configs[event_name] = config
+            await self.edit_event(ctx.guild, event_configs)
+
+            await ctx.send(f'**{event_name}** events will now be logged to the **<#{new_log_channel.id}>**')
+            error_msg = None
+        else:
+
+            error_msg = f"Could not set the log channel to <#{new_log_channel.id}>.\n" \
+                  f"Gabby Gums is missing the following critical permissions in <#{new_log_channel.id}> which would prevent log messages from being sent:\n"
+            error_msg += missing_perms_msg
+            error_msg += "\nPlease fix the permissions and try again or choose a different channel."
 
         # Return the modified event configs
-        return event_configs
+        return event_configs, error_msg
 
     async def edit_event(self, guild: discord.Guild, new_configs: GuildLoggingConfig):
         await db.set_server_log_configs(self.bot.db_pool, guild.id, new_configs)
