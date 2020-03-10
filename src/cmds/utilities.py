@@ -40,25 +40,27 @@ class Utilities(commands.Cog):
     async def cogtest(self, ctx: commands.Context):
         assert 1 == 0
 
-    @commands.command(name='bot_invite',
-                      aliases=['invite'],
-                      brief='Get an invite for Gabby Gums.',
-                      description='Get an invite for Gabby Gums.')
+    # region Invite Command
+    @commands.group(name='invite',
+                    aliases=['bot_invite'],
+                    brief='Get an invite for Gabby Gums.',
+                    description='Get an invite for Gabby Gums.')
     async def invite_link(self, ctx: commands.Context):
         # invite = "https://discordapp.com/oauth2/authorize?client_id={}&scope=bot&permissions={}".format(self.bot.user.id, 380096)  # Missing Manage Server
-
-        perm = discord.Permissions(
-            manage_guild=True,    # Required for invite tracking and management.
-            add_reactions=True,   # Required for the reaction based menu system.
-            view_audit_log=True,  # Required for determining who kicked/banned/unbanned a user
-            read_messages=True,   # Required to log deleted & edited messages and to see commands being used.
-            # manage_messages=True, # Required for the reaction based menu system. (Needed so we can remove the reactions from menus after a user clicks on a react & when the menu times out.) (New)
-            embed_links=True,     # Required for the log messages and the configuration of the bot.
-            attach_files=True,    # Required for logging deleted images. FUTURE FEATURE.
-            read_message_history=True,  # Required for the reaction based menu system. (Can not react to a message that has reactions by other users with out this permission.)
-            external_emojis=True, # Required for the reaction based menu system as some of the reactions are custom reactions.
-            send_messages=True    # Required for the log messages and the configuration of the bot.
-        )
+        if ctx.invoked_subcommand is None:
+            perm = discord.Permissions(
+                manage_guild=True,      # Required for invite tracking and management.
+                add_reactions=True,     # Required for the reaction based menu system.
+                view_audit_log=True,    # Required for determining who kicked/banned/unbanned a user
+                read_messages=True,     # Required to log deleted & edited messages and to see commands being used.
+                # manage_messages=True, # Required for the reaction based menu system. (Needed so we can remove the reactions from menus after a user clicks on a react & when the menu times out.) (New)
+                embed_links=True,       # Required for the log messages and the configuration of the bot.
+                attach_files=True,      # Required for logging deleted images. FUTURE FEATURE.
+                read_message_history=True,  # Required for the reaction based menu system. (Can not react to a message that has reactions by other users with out this permission.)
+                external_emojis=True,   # Required for the reaction based menu system as some of the reactions are custom reactions.
+                send_messages=True,     # Required for the log messages and the configuration of the bot.
+                manage_channels=True    # Required for invite events and improved accuracy of invite tracking.
+            )
 
         link = discord.utils.oauth_url(self.bot.user.id, permissions=perm)
         await ctx.send(f"Here's a link to invite Gabby Gums to your server:\n{link}")
