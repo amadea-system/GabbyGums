@@ -237,6 +237,58 @@ class Configuration(commands.Cog):
         await db.set_server_log_configs(self.bot.db_pool, guild.id, new_configs)
     # endregion
 
+    # region Log Channel Command
+    # ----- Logging Channel Commands ----- #
+    @commands.has_permissions(manage_messages=True)
+    @commands.guild_only()
+    @commands.group(name="log_channel", brief="Sets/unsets/shows the default logging channel.",
+                    description="Sets/unsets/shows the default logging channel."  # , usage='<command> [channel]'
+                    )
+    async def logging_channel(self, ctx: commands.Context):
+        if ctx.invoked_subcommand is None:
+            await ctx.send_help(self.logging_channel)
+
+
+    @logging_channel.command(name="set", brief="Sets the default logging channel.",
+                             description="Sets the default logging channel.")
+    async def set_logging_channel(self, ctx: commands.Context, channel: discord.TextChannel):
+        ch_perm: discord.Permissions = channel.guild.me.permissions_in(channel)
+        if ch_perm.send_messages and ch_perm.embed_links and ch_perm.read_messages:
+            await db.update_log_channel(self.bot.db_pool, ctx.guild.id, channel.id)
+            await ctx.send("Default Log channel set to <#{}>".format(channel.id))
+        else:
+            msg = f"Can not set the Default Log Channel to <#{channel.id}>.\n" \
+                  f"Gabby Gums is missing the following critical permissions in <#{channel.id}> which would prevent log messages from being sent:\n"
+            if not ch_perm.send_messages:
+                msg += "**Send Messages Permission**\n"
+            if not ch_perm.read_messages:
+                msg += "**Read Messages Permission**\n"
+            if not ch_perm.embed_links:
+                msg += "**Embed Links Permission**\n"
+            msg += "\nPlease fix the permissions and try again or choose a different channel."
+            await ctx.send(msg)
+
+
+    @logging_channel.command(name="unset", brief="Unsets the default log channel", description="Unsets the default log channel")
+    async def unset_logging_channel(self, ctx: commands.Context):
+
+        await db.update_log_channel(self.bot.db_pool, ctx.guild.id, log_channel_id=None)
+        await ctx.send("The Default Log channel has been cleared. "
+                       "Gabby Gums will no longer be able to log events which do not have a specific log channel set unless a new default log channel is set.")
+
+
+    @logging_channel.command(name="show", brief="Shows the default logging channel",
+                             description="Shows what channel is currently configured as the default logging channel")
+    async def show_logging_channel(self, ctx: commands.Context):
+
+        _log_channel = await db.get_log_channel(self.bot.db_pool, ctx.guild.id)
+        if _log_channel is not None:
+            await ctx.send("The Default Log Channel is currently set to <#{}>".format(_log_channel))
+        else:
+            await ctx.send(
+                "No Default Log Channel is configured. You can use `g!log_channel set` to set a new Default Log Channel.")
+    # endregion
+
     # region Reset Command
 
     @commands.has_permissions(manage_messages=True)

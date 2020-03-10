@@ -126,45 +126,6 @@ async def _about(ctx):
     await ctx.send(embed=embeds.about_message())
 
 
-# ----- Logging Channel Commands ----- #
-@commands.has_permissions(manage_messages=True)
-@commands.guild_only()
-@client.group(name="log_channel", brief="Sets/unsets/shows the channel currently assigned for logging.",
-              description="Sets/unsets/shows the channel currently assigned for logging."
-                          "\n Use `set` in the channel you want to designate for logging.",
-              usage='<command> [channel]')
-async def logging_channel(ctx: commands.Context):
-    if ctx.invoked_subcommand is None:
-        await ctx.send_help(logging_channel)
-
-
-@logging_channel.command(name="set", brief="Sets which channel the bot will log to.",
-                         description="Sets which channel the bot will log to.")
-async def set_logging_channel(ctx: commands.Context, channel: discord.TextChannel):
-    bot: GGBot = ctx.bot
-    await db.update_log_channel(bot.db_pool, ctx.guild.id, channel.id)
-    await ctx.send("Logging channel set to <#{}>".format(channel.id))
-
-
-@logging_channel.command(name="unset", brief="Unsets the log channel", description="Unsets the log channel")
-async def unset_logging_channel(ctx: commands.Context):
-    bot: GGBot = ctx.bot
-    await db.update_log_channel(bot.db_pool, ctx.guild.id, log_channel_id=None)
-    await ctx.send("Logging channel has been cleared. "
-                   "Gabby Gums will no longer be able to log events unless a new logging channel is set")
-
-
-@logging_channel.command(name="show", brief="Shows what channel is currently configured for logging",
-                         description="Shows what channel is currently configured for logging")
-async def show_logging_channel(ctx: commands.Context):
-    bot: GGBot = ctx.bot
-    _log_channel = await db.get_log_channel(bot.db_pool, ctx.guild.id)
-    if _log_channel is not None:
-        await ctx.send("Logging channel is currently set to <#{}>".format(_log_channel))
-    else:
-        await ctx.send("No channel is configured. Please use `g!log_ch set` in the channel you wish to use for logging.")
-
-
 # ----- Ignore User Commands ----- #
 @commands.has_permissions(manage_messages=True)
 @commands.guild_only()
