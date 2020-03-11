@@ -6,7 +6,6 @@ Commands include:
 Part of the Gabby Gums Discord Logger.
 """
 
-# import asyncio
 import logging
 from typing import TYPE_CHECKING, Optional, Dict, List, Union, Tuple, NamedTuple, Type, Any
 
@@ -62,25 +61,24 @@ async def get_event_configuration_embed(ctx: commands.Context, event_configs: Gu
 
 
 def get_edit_event_embed(event_type_name: str, event_configs: GuildLoggingConfig, error_message) -> discord.Embed:
-    # log.info(event_configs)
     configs: EventConfig = event_configs[event_type_name]
     if configs is None:
-        # Generate a default config
+        # If there is no config stored in the DB yet, generate a default config to start from.
         configs = EventConfig()
 
     enable_text = "Yes" if configs.enabled else "No"
-    onoff_toggle_text = "Off" if configs.enabled else "On"
+    on_off_toggle_text = "Off" if configs.enabled else "On"
     log_channel = f"<#{configs.log_channel_id}>" if configs.log_channel_id else "Default Log Channel"
     msg = f"_{guild_config_docs[event_type_name].full}_\n\nEnabled: **{enable_text}**\n" \
         f"Current Log Channel: **{log_channel}**\n\n\n" \
-        f"**Click** the 🔀 to turn this event **{onoff_toggle_text}**.\n" \
+        f"**Click** the 🔀 to turn this event **{on_off_toggle_text}**.\n" \
         f"**Enter** a **new log channel** to change which channel this event will log to.\n" \
         f"**Enter** `clear` to set the logging channel back to the **default log channel**.\n" \
         f"**Click** the <:backbtn:677188923310735361> to go back to list of all event configurations.\n" \
         f"**Click** the 🛑 to exit the Event Configuration Menu System."
 
-    embed = discord.Embed(title=f"Current {event_type_name} Configuration:",
-                          description=msg)
+    embed = discord.Embed(title=f"Current {event_type_name} Configuration:", description=msg)
+
     if error_message is not None:
         embed.add_field(name="\N{ZERO WIDTH SPACE}\n\N{WARNING SIGN} Error \N{WARNING SIGN}", value=error_message)
     return embed
@@ -249,7 +247,7 @@ class Configuration(commands.Cog):
         else:
 
             error_msg = f"Could not set the log channel to <#{new_log_channel.id}>.\n" \
-                  f"Gabby Gums is missing the following critical permissions in <#{new_log_channel.id}> which would prevent log messages from being sent:\n"
+                        f"Gabby Gums is missing the following critical permissions in <#{new_log_channel.id}> which would prevent log messages from being sent:\n"
             error_msg += missing_perms_msg
             error_msg += "\nPlease fix the permissions and try again or choose a different channel."
 
