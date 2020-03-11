@@ -149,7 +149,6 @@ class Configuration(commands.Cog):
 
         edit_buttons = [('🔀', 'toggle'), ('<:backbtn:679032730243301397>', 'back')]  # ('🔙', 'back')]  # , ('🛑', 'stop')]
 
-        # edit_msg = None
         error_msg = None
         while True:
 
@@ -158,21 +157,18 @@ class Configuration(commands.Cog):
             edit_rsp = await edit_page.run(ctx)
 
             if edit_rsp is None:
-                # await ctx.send(f"Done!")
                 await self.finished_embed(ctx, event_configs)
                 return
-            # edit_msg = edit_rsp.ui_message
+
             edit_rsp_str = edit_rsp.response.lower().strip()
             if edit_rsp_str == 'stop':
-                # await ctx.send(f"Done!")
                 await self.finished_embed(ctx, event_configs)
-                # log.info("exiting config_event_menu via stop button.")
                 return
+
             elif edit_rsp_str == 'back':
-                # log.info("Recursively calling config_event_menu via back button.")
                 await self.config_event_menu(ctx)
-                # log.info("exiting from back button.")
                 return
+
             elif edit_rsp_str == 'toggle':
                 event_configs = await self.toggle_event(ctx, event_type_rsp.response, event_configs)
                 error_msg = None
@@ -189,8 +185,8 @@ class Configuration(commands.Cog):
                 except commands.BadArgument:
                     await ctx.send('Invalid channel!')
 
-
-    async def finished_embed(self, ctx: commands.Context, event_configs: GuildLoggingConfig):
+    @staticmethod
+    async def finished_embed(ctx: commands.Context, event_configs: GuildLoggingConfig):
         # Send a final static embed showing the now configured events.
         final_embed = await get_event_configuration_embed(ctx, event_configs, final=True)
         await ctx.send(embed=final_embed)
