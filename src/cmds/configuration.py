@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Optional, Dict, List, Union, Tuple, NamedTuple
 
 import discord
 from discord.ext import commands
+import eCommands
 
 import db
 from miscUtils import prettify_permission_name
@@ -262,16 +263,18 @@ class Configuration(commands.Cog):
     # ----- Logging Channel Commands ----- #
     @commands.has_permissions(manage_messages=True)
     @commands.guild_only()
-    @commands.group(name="log_channel", brief="Sets/unsets/shows the default logging channel.",
-                    description="Sets/unsets/shows the default logging channel."  # , usage='<command> [channel]'
-                    )
+    @eCommands.group(name="log_channel", brief="Sets/unsets/shows the default logging channel.",
+                     description="Sets/unsets/shows the default logging channel.",  # , usage='<command> [channel]'
+                     examples=["set #logs", "set 123456789123456789", 'show', 'unset']
+                     )
     async def logging_channel(self, ctx: commands.Context):
         if ctx.invoked_subcommand is None:
             await ctx.send_help(self.logging_channel)
 
 
     @logging_channel.command(name="set", brief="Sets the default logging channel.",
-                             description="Sets the default logging channel.")
+                             description="Sets the default logging channel.",
+                             examples=["#logs", "123456789123456789"])
     async def set_logging_channel(self, ctx: commands.Context, channel: discord.TextChannel):
         ch_perm: discord.Permissions = channel.guild.me.permissions_in(channel)
         if ch_perm.send_messages and ch_perm.embed_links and ch_perm.read_messages:
