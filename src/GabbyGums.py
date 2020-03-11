@@ -36,7 +36,7 @@ client = GGBot(command_prefix="g!",
                # description="A simple logging bot that ignores PluralKit proxies.\n",
                owner_id=389590659335716867,
                case_insensitive=True)
-client.remove_command("help")  # Remove the built in help command so we can make the about section look nicer.
+# client.remove_command("help")  # Remove the built in help command so we can make the about section look nicer.
 
 
 async def is_channel_ignored(pool: asyncpg.pool.Pool, guild_id: int, channel_id: int) -> bool:
@@ -97,33 +97,9 @@ async def on_ready():
     logging.info('Username: {0.name}, ID: {0.id}'.format(client.user))
     logging.info("Connected to {} servers.".format(len(client.guilds)))
     logging.info('------')
-    #
-    # activity = discord.Game("{}help".format(client.command_prefix))
-    # await client.change_presence(status=discord.Status.online, activity=activity)
 
     # ensure the invite cache is upto date on connection.
     logging.warning("Gabby Gums is fully loaded.")
-
-
-# ----- Help & About Commands ----- #
-@client.command(name="Help", hidden=True)
-async def _help(ctx, *args):
-
-    if 'error_log_channel' not in config:
-        return
-    error_log_channel = client.get_channel(config['error_log_channel'])
-    await error_log_channel.send("help called by <@{}> - {}#{}".format(ctx.author.id, ctx.author.name, ctx.author.discriminator))
-    print("help called by <@{}> - {}#{}".format(ctx.author.id, ctx.author.name, ctx.author.discriminator))
-    if args:
-        await ctx.send_help(*args)
-    else:
-        await ctx.send(embed=embeds.about_message())
-        await ctx.send_help()
-
-
-@client.command(name="About", hidden=True)
-async def _about(ctx):
-    await ctx.send(embed=embeds.about_message())
 
 
 # ----- Ignore User Commands ----- #

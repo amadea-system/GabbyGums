@@ -17,6 +17,7 @@ from utils.errors import handle_permissions_error
 log = logging.getLogger(__name__)
 
 extensions = (
+    'cmds.helpCmd',
     'events.memberJoinLeave',
     'events.memberUpdate',
     'events.bulkMessageDelete',

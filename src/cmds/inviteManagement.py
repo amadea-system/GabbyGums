@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-class InviteManagement(commands.Cog):
+class InviteManagement(commands.Cog, name="Invite Management"):
     def __init__(self, bot: 'GGBot'):
         self.bot = bot
 
@@ -36,7 +36,7 @@ class InviteManagement(commands.Cog):
     @commands.group(name="invites",
                     brief="Allows for naming invites for easier identification and listing details about them.",
                     description="Allows for naming invites for easier identification and listing details about them.",
-                    usage='<command> [Invite ID]')
+                    usage='<command>')
     async def invite_manage(self, ctx: commands.Context):
         if not ctx.guild.me.guild_permissions.manage_guild:
             await ctx.send("⚠ Gabby gums needs the **Manage Server** permission for invite tracking.")
@@ -46,7 +46,8 @@ class InviteManagement(commands.Cog):
                 await ctx.send_help(self.invite_manage)
 
 
-    @invite_manage.command(name="list", brief="Lists the invites in the server and if they have a defined name.")
+    @invite_manage.command(name="list", brief="Lists the invites in the server and if they have a defined name.",
+                           description="Lists the invites in the server and if they have a defined name.")
     async def _list_invites(self, ctx: commands.Context):
         if ctx.guild.me.guild_permissions.manage_guild:
 
@@ -69,7 +70,7 @@ class InviteManagement(commands.Cog):
 
 
     @invite_manage.command(name="name", brief="Lets you give an invite a nickname so it can be easier to identify.",
-                           usage='invites name [Invite ID] [Invite Nickname]')
+                           usage='<Invite ID> <Invite Nickname>')
     async def _name_invite(self, ctx: commands.Context, invite_id: discord.Invite, nickname: str = None):
         bot: GGBot = ctx.bot
         if ctx.guild.me.guild_permissions.manage_guild:
@@ -79,7 +80,8 @@ class InviteManagement(commands.Cog):
             await ctx.send("{} has been given the nickname: {}".format(invite_id.id, nickname))
 
 
-    @invite_manage.command(name="unname", brief="Removes the name from an invite.")
+    @invite_manage.command(name="unname", brief="Removes the name from an invite.",
+                           usage='<Invite ID>')
     async def _unname_invite(self, ctx: commands.Context, invite_id: discord.Invite):
         bot: GGBot = ctx.bot
         if ctx.guild.me.guild_permissions.manage_guild:
