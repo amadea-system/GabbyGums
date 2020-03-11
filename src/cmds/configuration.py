@@ -263,7 +263,7 @@ class Configuration(commands.Cog):
     # ----- Logging Channel Commands ----- #
     @commands.has_permissions(manage_messages=True)
     @commands.guild_only()
-    @eCommands.group(name="log_channel", brief="Sets/unsets/shows the default logging channel.",
+    @eCommands.group(name="log_channel", aliases=["log_ch"], brief="Sets/unsets/shows the default logging channel.",
                      description="Sets/unsets/shows the default logging channel.",  # , usage='<command> [channel]'
                      examples=["set #logs", "set 123456789123456789", 'show', 'unset']
                      )
