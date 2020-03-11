@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-# Formatting for now and before text in embeds.
+# Formatting for now and before text in embeds.  http://jkorpela.fi/chars/spaces.html
 now_txt = "Now:\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{PUNCTUATION SPACE}\N{HAIR SPACE}"
 before_txt = "Before:\N{NO-BREAK SPACE}\N{SIX-PER-EM SPACE}"
 
