@@ -11,7 +11,7 @@ Part of the Gabby Gums Discord Logger.
 import logging
 import itertools
 
-from typing import List, Optional
+from typing import List, Optional, Union
 import discord
 from discord.ext import commands as dpy_cmds
 
@@ -76,6 +76,26 @@ class EmbedHelp(dpy_cmds.DefaultHelpCommand):
 
         return msg
 
+    def add_examples(self, command: Union[dpy_cmds.Group, dpy_cmds.Command], embed: discord.Embed) -> discord.Embed:
+
+        if hasattr(command, 'examples') and len(command.examples) > 0:
+            # log.info("has examples attr")
+            parent = command.full_parent_name
+            alias = command.name if not parent else parent + ' ' + command.name
+
+            command_signature = f"{self.clean_prefix}{alias}"
+            example_msg = []
+            for example in command.examples:
+                # log.info(f"Adding: `{command_signature} {example}`")
+                example_msg.append(f"`{command_signature} {example}`")
+
+            example_msg.append("\n")
+            example_msg = "\n".join(example_msg)
+            # log.info(f"Final fiels: {example_msg}")
+            embed.add_field(name="Examples:", value=example_msg, inline=False)
+
+        return embed
+
     async def send_bot_help(self, mapping):
         ctx: dpy_cmds.Context = self.context
         bot: dpy_cmds.Bot = ctx.bot
@@ -133,6 +153,8 @@ class EmbedHelp(dpy_cmds.DefaultHelpCommand):
         embed = self.help_embed()
         embed.description = "\n".join(embed_descrip)
 
+        embed = self.add_examples(command, embed)
+
         await self.send_embed(embed)
 
 
@@ -144,7 +166,9 @@ class EmbedHelp(dpy_cmds.DefaultHelpCommand):
         filtered = await self.filter_commands(group.commands, sort=self.sort_commands)
         if len(filtered) > 0:
             field_value = self.get_formated_commands(filtered)  # , heading=self.commands_heading
-            embed.add_field(name=self.commands_heading, value="\n".join(field_value), inline=False)
+            embed.add_field(name="Sub-Commands:", value="\n".join(field_value), inline=False)
+
+        embed = self.add_examples(group, embed)
 
         note = self.get_ending_note()
         if note:
