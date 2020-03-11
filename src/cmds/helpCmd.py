@@ -11,6 +11,7 @@ Part of the Gabby Gums Discord Logger.
 import logging
 import itertools
 
+from typing import List, Optional
 import discord
 from discord.ext import commands as dpy_cmds
 
@@ -22,6 +23,58 @@ support_link = "https://discord.gg/3Ugade9"
 
 
 class EmbedHelp(dpy_cmds.DefaultHelpCommand):
+
+    def help_embed(self) -> discord.Embed:
+        return discord.Embed(title='Gabby Gums Help', color=0x9932CC)
+
+    async def send_embed(self, embed: discord.embeds):
+
+        dest: discord.abc.Messageable = self.get_destination()
+        await dest.send(embed=embed)
+
+    def get_command_formatting_for_embed(self, command: dpy_cmds.Command) -> List[str]:
+        """A utility function to format the non-indented block of commands and groups.
+
+        Parameters
+        ------------
+        command: :class:`Command`
+            The command to format.
+        """
+        msg = []
+        if command.description:
+            msg.append(command.description)
+            # msg.append("\n")
+        elif command.brief:
+            msg.append(command.brief)
+            # msg.append("\n")
+
+        signature = self.get_command_signature(command)
+        msg.append(f"```{signature}```")
+
+        if command.help:
+            msg.append(command.help)
+
+        return msg
+
+    def get_formated_commands(self, commands, *, max_size=None) -> Optional[List[str]]:
+        """Indents a list of commands after the specified heading."""
+
+        if not commands:
+            return
+
+        msg = []
+        # msg.append(heading)
+        max_size = max_size or self.get_max_size(commands)
+
+        get_width = discord.utils._string_width
+        for command in commands:
+            name = command.name
+            width = max_size - (get_width(name) - len(name))
+            entry = '{0}`{1:<{width}}`\N{EM QUAD}{2}'.format(self.indent * ' ', command.name, command.short_doc,
+                                                             width=width)
+            msg.append(self.shorten_text(entry))
+
+        return msg
 
     async def send_bot_help(self, mapping):
         ctx: dpy_cmds.Context = self.context
@@ -35,7 +88,7 @@ class EmbedHelp(dpy_cmds.DefaultHelpCommand):
                             f"\nIf you need assistance, please join our support server @ {support_link} and we will be happy to help you.")
             return
 
-        embed = discord.Embed(title='Gabby Gums Help', color=0x9932CC)
+        embed = self.help_embed()
 
         embed.add_field(name="Who can use Gabby Gums",
                         value="Anyone!\n"
@@ -56,20 +109,13 @@ class EmbedHelp(dpy_cmds.DefaultHelpCommand):
 
 
         filtered = await self.filter_commands(bot.commands, sort=True, key=get_category)
-        max_size = self.get_max_size(filtered)
         to_iterate = itertools.groupby(filtered, key=get_category)
 
         # Now we can add the commands to the page.
         for category, commands in to_iterate:
             commands = sorted(commands, key=lambda c: c.name) if self.sort_commands else list(commands)
 
-            field_values = []
-            get_width = discord.utils._string_width  # TODO: Don't use protected member.
-            for command in commands:
-                width = max_size - (get_width(command.name) - len(command.name))
-                entry = '{0}`{1:<{width}}`\N{EM QUAD}{2}'.format(self.indent * ' ', command.name, command.short_doc, width=width)
-                field_values.append(self.shorten_text(entry))
-
+            field_values = self.get_formated_commands(commands)
             field_values = split_text(field_values, max_size=1000)
             for i, field_value in enumerate(field_values):
                 name = category if i == 0 else "\N{Zero Width Space}"
@@ -80,6 +126,31 @@ class EmbedHelp(dpy_cmds.DefaultHelpCommand):
             embed.add_field(name="\N{Zero Width Space}", value=note)
 
         await dest.send(embed=embed)
+
+
+    async def send_command_help(self, command):
+        embed_descrip = self.get_command_formatting_for_embed(command)
+        embed = self.help_embed()
+        embed.description = "\n".join(embed_descrip)
+
+        await self.send_embed(embed)
+
+
+    async def send_group_help(self, group):
+        embed = self.help_embed()
+        embed_desc = self.get_command_formatting_for_embed(group)
+        embed.description = "\n".join(embed_desc)
+
+        filtered = await self.filter_commands(group.commands, sort=self.sort_commands)
+        if len(filtered) > 0:
+            field_value = self.get_formated_commands(filtered)  # , heading=self.commands_heading
+            embed.add_field(name=self.commands_heading, value="\n".join(field_value), inline=False)
+
+        note = self.get_ending_note()
+        if note:
+            embed.add_field(name="\N{Zero Width Space}", value=note, inline=False)
+
+        await self.send_embed(embed)
 
 
 def setup(bot):
