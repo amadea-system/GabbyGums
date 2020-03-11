@@ -106,7 +106,7 @@ class Utilities(commands.Cog):
                         inline=False)
 
         embed.add_field(name="Use External Emojis (Required)",
-                        value="The Use External Emojis permission is required as some logs use external emojis in them.",
+                        value="The Use External Emojis permission is required as some logs and configuration menus use external emojis in them.",
                         inline=False)
 
         embed.add_field(name="Add Reactions (Required)",
