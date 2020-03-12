@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Optional, Dict, List, Union, Tuple, NamedTuple
 
 import discord
 from discord.ext import commands
+import eCommands
 
 import db
 import miscUtils
@@ -35,7 +36,7 @@ class Dev(commands.Cog):
     # ----- Debugging Commands ----- #
 
     @commands.guild_only()
-    @commands.command(brief="Owner only test command")
+    @eCommands.group(brief="Owner only test command")
     async def devtest(self, ctx: commands.Context):
         await ctx.send(f"hello from {__name__}")
 
