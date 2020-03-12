@@ -166,26 +166,32 @@ async def get_server_log_configs(pool, sid: int) -> GuildConfigs.GuildLoggingCon
         # return GuildConfigs.load_nested_dict(GuildConfigs.GuildLoggingConfig, value) if value else GuildConfigs.GuildLoggingConfig()
         return GuildConfigs.GuildLoggingConfig.from_dict(value)
 
-# ----- Ignored Users DB Functions ----- #
+# ----- Users Override DB Functions ----- #
 
 @db_deco
-async def add_ignored_user(pool, sid: int, ignored_user_id: int):  # Good
+async def add_user_override(pool, sid: int, ignored_user_id: int, override_log_ch: Optional[int]):  # Good
     async with pool.acquire() as conn:
-        await conn.execute("INSERT INTO ignored_users(user_id, server_id) VALUES($1, $2)", ignored_user_id, sid)
+        await conn.execute("""
+                            INSERT INTO ignored_users(user_id, server_id, log_ch) VALUES($1, $2, $3)
+                            ON CONFLICT (server_id, user_id)
+                            DO UPDATE
+                            SET log_ch = EXCLUDED.log_ch
+                            """, ignored_user_id, sid, override_log_ch)
 
 
 @db_deco
-async def remove_ignored_user(pool, sid: int, ignored_user_id: int):  # Good
+async def remove_user_override(pool, sid: int, ignored_user_id: int):  # Good
     async with pool.acquire() as conn:
         await conn.execute("DELETE FROM ignored_users WHERE server_id = $1 AND user_id = $2", sid, ignored_user_id)
 
 
 @db_deco
-async def get_ignored_users(pool, sid: int) -> List[int]:  # Good
+async def get_users_overrides(pool: asyncpg.pool.Pool, sid: int) -> List[asyncpg.Record]:  # Good
     async with pool.acquire() as conn:
+        conn: asyncpg.connection.Connection
         # TODO: Optimise by replacing * with user_id
         raw_rows = await conn.fetch('SELECT * FROM ignored_users WHERE server_id = $1', sid)
-        rows = [row["user_id"] for row in raw_rows]
+        rows = raw_rows#[row["user_id"] for row in raw_rows]
     return rows
 
 
@@ -496,12 +502,14 @@ async def create_tables(pool):
                            )
                        ''')
 
+        # ALTER TABLE ignored_users ADD COLUMN log_ch BIGINT DEFAULT NULL;
         # Create ignored_users table
         await conn.execute('''
                            CREATE TABLE if not exists ignored_users(
                                 id           SERIAL PRIMARY KEY,
                                 server_id    BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE, 
                                 user_id      BIGINT NOT NULL,
+                                log_ch       BIGINT DEFAULT NULL,
                                 UNIQUE (server_id, user_id)
                            )
                        ''')

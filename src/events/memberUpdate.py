@@ -33,7 +33,7 @@ class MemberUpdate(commands.Cog):
 
         if before.nick != after.nick:
 
-            log_channel = await self.bot.get_event_or_guild_logging_channel(after.guild.id, event_type_nick)
+            log_channel = await self.bot.get_event_or_guild_logging_channel(after.guild.id, event_type_nick, after.id)
             if log_channel is None:
                 # Silently fail if no log channel is configured.
                 return

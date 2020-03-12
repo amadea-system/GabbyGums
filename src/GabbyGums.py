@@ -2,28 +2,24 @@
 
 '''
 
-import time
 import json
-import os
 import logging
 import traceback
 import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, List, Dict, Union
-from datetime import timedelta
 
 import psutil
 import asyncpg
 import aiohttp
 import discord
 from discord.ext import commands
-from discord.utils import oauth_url
 
 import db
 import embeds
 import miscUtils
-import GuildConfigs
-from imgUtils.avatarChangedImgProcessor import get_avatar_changed_image
+
+
 from bot import GGBot
 
 if TYPE_CHECKING:
@@ -36,7 +32,6 @@ client = GGBot(command_prefix="g!",
                # description="A simple logging bot that ignores PluralKit proxies.\n",
                owner_id=389590659335716867,
                case_insensitive=True)
-# client.remove_command("help")  # Remove the built in help command so we can make the about section look nicer.
 
 
 async def is_channel_ignored(pool: asyncpg.pool.Pool, guild_id: int, channel_id: int) -> bool:
@@ -46,38 +41,12 @@ async def is_channel_ignored(pool: asyncpg.pool.Pool, guild_id: int, channel_id:
     return False
 
 
-async def is_user_ignored(pool: asyncpg.pool.Pool, guild_id: int, user_id: int) -> bool:
-    _ignored_users = await db.get_ignored_users(pool, int(guild_id))
-    if int(user_id) in _ignored_users:
-        return True  # This is a message from a user the guild does not wish to log. Do not log the event.
-    return False
-
-
 async def is_category_ignored(pool: asyncpg.pool.Pool, guild_id: int, category: Optional[discord.CategoryChannel]) -> bool:
     if category is not None:  # If channel is not in a category, don't bother querying DB
         _ignored_categories = await db.get_ignored_categories(pool, int(guild_id))
         if category.id in _ignored_categories:
             return True
     return False
-
-
-async def get_event_or_guild_logging_channel(pool: asyncpg.pool.Pool, guild_id: int, event_type: Optional[str] = None) -> Optional[discord.TextChannel]:
-    if event_type is not None:
-        log_configs = await db.get_server_log_configs(pool, guild_id)
-        event_configs = log_configs[event_type]
-        if event_configs is not None:
-            if event_configs.enabled is False:
-                return None  # Logs for this type are disabled. Exit now.
-            if event_configs.log_channel_id is not None:
-                return await get_channel_safe(event_configs.log_channel_id)  # return event specific log channel
-
-    # No valid event specific configs exist. Attempt to use default log channel.
-    _log_channel_id = await db.get_log_channel(pool, guild_id)
-    if _log_channel_id is not None:
-        return await get_channel_safe(_log_channel_id)
-
-    # No valid event configs or global configs found. Only option is to silently fail
-    return None
 
 
 async def get_channel_safe(channel_id: int) -> Optional[discord.TextChannel]:
@@ -101,39 +70,6 @@ async def on_ready():
     # ensure the invite cache is upto date on connection.
     logging.warning("Gabby Gums is fully loaded.")
 
-
-# ----- Ignore User Commands ----- #
-@commands.has_permissions(manage_messages=True)
-@commands.guild_only()
-@client.group(name="ignore_user", brief="Sets which users/bots will be ignored by Gabby Gums",
-              description="Sets which users/bots will be ignored by Gabby Gums",
-              usage='<command> [Member]')
-async def ignore_user(ctx: commands.Context):
-    if ctx.invoked_subcommand is None:
-        await ctx.send_help(ignore_user)
-
-
-@ignore_user.command(name="list", brief="Lists which users are currently ignored.")
-async def _list(ctx: commands.Context):
-    await ctx.send("The following users are being ignored by Gabby Gums:")
-    bot: GGBot = ctx.bot
-    _ignored_users = await db.get_ignored_users(bot.db_pool, ctx.guild.id)
-    for member_id in _ignored_users:
-        await ctx.send("<@{}>".format(member_id))
-
-
-@ignore_user.command(name="add", brief="Add a new member to be ignored")
-async def add(ctx: commands.Context, member: discord.Member):
-    bot: GGBot = ctx.bot
-    await db.add_ignored_user(bot.db_pool, ctx.guild.id, member.id)
-    await ctx.send("<@{}> - {}#{} has been ignored.".format(member.id, member.name, member.discriminator))
-
-
-@ignore_user.command(name="remove", brief="Stop ignoring a member")
-async def remove(ctx: commands.Context, member: discord.Member):
-    bot: GGBot = ctx.bot
-    await db.remove_ignored_user(bot.db_pool, ctx.guild.id, member.id)
-    await ctx.send("<@{}> - {}#{} is no longer being ignored.".format(member.id, member.name, member.discriminator))
 
 
 # ----- Ignore Channel Commands ----- #
@@ -212,12 +148,6 @@ async def remove_category(ctx: commands.Context, *, category: discord.CategoryCh
     bot: GGBot = ctx.bot
     await db.remove_ignored_category(bot.db_pool, ctx.guild.id, category.id)
     await ctx.send("<#{}> is no longer being ignored.".format(category.id))
-
-
-
-
-
-
 
 
 @commands.is_owner()
@@ -352,13 +282,16 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
         author = payload.cached_message.author if payload.cached_message is not None else client.get_user(db_cached_message.user_id)
 
         # Check if the message is from Gabby Gums or an ignored user. If it is, bail.
-        if author is not None and (client.user.id == author.id or await is_user_ignored(client.db_pool, payload.guild_id, author.id)):
+        if author is not None and (client.user.id == author.id):
             await cleanup_message_cache()
             return
+
+        author_id = author.id if author is not None else None
     else:
         # Message was not in either cache. Set msg and author to None.
         cache_exists = False
         msg = None
+        author_id = None
         author = None
 
     # Check with PK API Last to reduce PK server load.
@@ -380,8 +313,15 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
         logging.warning(
             "Could not connect to PK server with out errors. Assuming message should be logged.\n{}".format(e))
 
+    if db_cached_message is not None and db_cached_message.pk_system_account_id is not None:
+        pk_system_owner = client.get_user(db_cached_message.pk_system_account_id)
+    else:
+        pk_system_owner = None
+
+    effective_author_id = pk_system_owner.id if pk_system_owner is not None else author_id
+
     # Get the servers logging channel.
-    log_channel = await get_event_or_guild_logging_channel(client.db_pool, payload.guild_id, event_type)
+    log_channel = await client.get_event_or_guild_logging_channel(payload.guild_id, event_type, effective_author_id)
     if log_channel is None:
         # Silently fail if no log channel is configured.
         await cleanup_message_cache()
@@ -406,11 +346,6 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
 
     if msg == "":
         msg = "None"
-
-    if db_cached_message is not None and db_cached_message.pk_system_account_id is not None:
-        pk_system_owner = client.get_user(db_cached_message.pk_system_account_id)
-    else:
-        pk_system_owner = None
 
     embed = embeds.deleted_message(message_content=msg, author=author, channel_id=channel_id,
                                    message_id=payload.message_id, webhook_info=db_cached_message,
@@ -516,14 +451,16 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
             # The message content has not changed. This is a pin/unpin, embed edit (which would be from a bot or discord)
             return
 
-        if await is_user_ignored(client.db_pool, guild_id, author_id):
-            return
-
         if await is_channel_ignored(client.db_pool, guild_id, channel_id):
             return
 
         channel: discord.TextChannel = await get_channel_safe(channel_id)
         if await is_category_ignored(client.db_pool, guild_id, channel.category):
+            return
+
+        log_channel = await client.get_event_or_guild_logging_channel(guild_id, event_type, author_id)
+        if log_channel is None:
+            # Silently fail if no log channel is configured or if the event or user is ignored.
             return
 
         if author is None:
@@ -536,99 +473,12 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
 
         embed = embeds.edited_message(author_id, author.name, author.discriminator, channel_id, before_msg, after_msg, message_id, guild_id)
 
-        log_channel = await get_event_or_guild_logging_channel(client.db_pool, guild_id, event_type)
-        if log_channel is None:
-            # Silently fail if no log channel is configured.
-            return
-
         # try:
         # await log_channel.send(embed=embed)
         await client.send_log(log_channel, event_type, embed=embed)
 
         if db_cached_message is not None:
             await db.update_cached_message(client.db_pool, payload.data['guild_id'], payload.message_id, after_msg)
-
-
-# For debugging purposes only.
-@commands.is_owner()
-@client.command(name="pfp")
-async def pfp_test_cmd(ctx: commands.Context, after: discord.Member):
-
-    event_type_avatar = "user_avatar_update"
-    before: discord.Member = ctx.author
-    # noinspection PyTypeChecker
-    await avatar_changed_update(before, after)
-
-
-# For debugging purposes only.
-@commands.is_owner()
-@client.command(name="pfp-all")
-async def pfp_all_test_cmd(ctx: commands.Context, maximum_number: int = 10):
-    from random import SystemRandom as sRandom
-    random = sRandom()
-    members: List[discord.Member] = list(client.get_all_members())
-    await ctx.send(f"Generating {maximum_number} avatar changed embeds out of {len(members)} total members.")
-    some_members = random.choices(members, k=maximum_number)
-    for member in some_members:
-        # noinspection PyTypeChecker
-        await avatar_changed_update(member, member)
-    await ctx.send(f"Done sending test embeds.")
-
-
-@client.event
-async def on_user_update(before: discord.User, after: discord.User):
-    # username, Discriminator
-
-    if before.avatar != after.avatar:
-        # Get a list of guilds the user is currently in.
-        await avatar_changed_update(before, after)
-
-    if before.name != after.name or before.discriminator != after.discriminator:
-        await username_changed_update(before, after)
-
-
-async def username_changed_update(before: discord.User, after: discord.User):
-    event_type_name = "username_change"
-    # Username and/or discriminator changed
-    embed = embeds.user_name_update(before, after)
-
-    guilds = [guild for guild in client.guilds if before in guild.members]
-    if len(guilds) > 0:
-        for guild in guilds:
-            log_channel = await get_event_or_guild_logging_channel(client.db_pool, guild.id, event_type_name)
-            if log_channel is not None:
-                # await log_channel.send(embed=embed)
-                await client.send_log(log_channel, event_type_name, embed=embed)
-
-
-async def avatar_changed_update(before: discord.User, after: discord.User):
-    """Sends the appropriate logs on a User Avatar Changed Event"""
-    event_type_avatar = "member_avatar_change"
-
-    guilds = [guild for guild in client.guilds if before in guild.members]
-    if len(guilds) > 0:
-        # get the pfp changed embed image and convert it to a discord.File
-        avatar_changed_file_name = "avatarChanged.png"
-
-        avatar_info = {"before name": before.name, "before id": before.id, "before pfp": before.avatar_url_as(format="png"),
-                       "after name": after.name, "after id": after.id, "after pfp": after.avatar_url_as(format="png")
-                       }  # For Debugging
-
-        with await get_avatar_changed_image(client, before, after, avatar_info) as avatar_changed_bytes:
-            # create the embed
-            embed = embeds.user_avatar_update(before, after, avatar_changed_file_name)
-
-            # loop through all the guilds the member is in and send the embed and image
-            for guild in guilds:
-                log_channel = await get_event_or_guild_logging_channel(client.db_pool, guild.id, event_type_avatar)
-                if log_channel is not None:
-                    # The File Object needs to be recreated for every post, and the buffer needs to be rewound to the beginning
-                    # TODO: Handle case where avatar_changed_bytes could be None.
-                    avatar_changed_bytes.seek(0)
-                    avatar_changed_img = discord.File(filename=avatar_changed_file_name, fp=avatar_changed_bytes)
-                    # Send the embed and file
-                    # await log_channel.send(file=avatar_changed_img, embed=embed)
-                    await client.send_log(log_channel, event_type_avatar, embed=embed, file=avatar_changed_img)
 
 
 @client.event

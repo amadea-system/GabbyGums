@@ -364,7 +364,7 @@ class Utilities(commands.Cog):
 
         # List all users being ignored
         ignored_users_msg_fragments = []
-        ignored_users_ids = await db.get_ignored_users(self.bot.db_pool, guild.id)
+        ignored_users_ids = await db.get_users_overrides(self.bot.db_pool, guild.id)
         if len(ignored_users_ids) > 0:
             for user_id in ignored_users_ids:
                 ignored_users_msg_fragments.append(f"<@!{user_id}>")
@@ -579,7 +579,7 @@ class Utilities(commands.Cog):
 
         # List all users being ignored
         ignored_users_msg_fragments = []
-        ignored_users_ids = await db.get_ignored_users(self.bot.db_pool, guild.id)
+        ignored_users_ids = await db.get_users_overrides(self.bot.db_pool, guild.id)
         if len(ignored_users_ids) > 0:
             for user_id in ignored_users_ids:
                 ignored_users_msg_fragments.append(f"<@!{user_id}>")

@@ -20,6 +20,7 @@ extensions = (
     'cmds.helpCmd',
     'events.memberJoinLeave',
     'events.memberUpdate',
+    'events.userUpdate',
     'events.bulkMessageDelete',
     'events.channelEvents',
     'events.memberBans',
@@ -86,7 +87,15 @@ class GGBot(commands.Bot):
     # endregion
 
     # region Get Logging Channel Methods
-    async def get_event_or_guild_logging_channel(self, guild_id: int, event_type: Optional[str] = None) -> Optional[discord.TextChannel]:
+
+    async def get_event_or_guild_logging_channel(self, guild_id: int, event_type: Optional[str] = None, user_id: Optional[int] = None) -> Optional[discord.TextChannel]:
+
+        # Check if there are any user overrides.
+        if user_id is not None:
+            has_override, override_ch_id = await self.check_user_overrides(guild_id, user_id)
+            if has_override:
+                return await self.get_channel_safe(override_ch_id) if override_ch_id is not None else None
+
         if event_type is not None:
             log_configs = await db.get_server_log_configs(self.db_pool, guild_id)
             event_configs = log_configs[event_type]
@@ -117,6 +126,8 @@ class GGBot(commands.Bot):
     # endregion
 
     # region User/Chan/Cat Ignored Checkers
+
+
     async def is_channel_ignored(self, guild_id: int, channel_id: int) -> bool:
         _ignored_channels = await db.get_ignored_channels(self.db_pool, int(guild_id))
         if int(channel_id) in _ignored_channels:
@@ -124,11 +135,20 @@ class GGBot(commands.Bot):
         return False
 
 
-    async def is_user_ignored(self, guild_id: int, user_id: int) -> bool:
-        _ignored_users = await db.get_ignored_users(self.db_pool, int(guild_id))
-        if int(user_id) in _ignored_users:
-            return True  # This is a message from a user the guild does not wish to log. Do not log the event.
-        return False
+    async def check_user_overrides(self, guild_id: int, user_id: int) -> Tuple[bool, Optional[int]]:
+        """
+        Check to see if the user is configures to be ignored or redirected
+
+        Returns (True, None) if the user is ignored
+        Returns (True, TextChannel_ID) if the user is redirected
+        Returns (False, None) If there are no overrides at all
+        """
+        log_ch = None
+        user_overrides = await db.get_users_overrides(self.db_pool, guild_id)
+        for user in user_overrides:
+            if user['user_id'] == user_id:
+                return True, user['log_ch']
+        return False, None
 
 
     async def is_category_ignored(self, guild_id: int, category: Optional[discord.CategoryChannel]) -> bool:

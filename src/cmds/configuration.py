@@ -347,6 +347,65 @@ class Configuration(commands.Cog):
 
     # endregion
 
+    # region Ignore/Redirect User Commands
+    @commands.has_permissions(manage_messages=True)
+    @commands.guild_only()
+    @eCommands.group(name="user_overrides", aliases=["ignore_user"],
+                     brief="Ignore or Redirect logs from specific users",
+                     description="Allows you to configure Gabby Gums to ignore or redirect logs for specific users.",
+                     usage='<command> [Member] [Channel]',
+                     examples=["list", "redirect @Hibiki #Hibiki-logs", "ignore @Hibiki"])
+    async def user_overrides(self, ctx: commands.Context):
+        if ctx.invoked_subcommand is None:
+            await ctx.send_help(self.user_overrides)
+
+
+    @user_overrides.command(name="list", brief="Lists users that are ignored or being redirected")
+    async def _list(self, ctx: commands.Context):
+        embed = discord.Embed(title="Ignored & Redirected Users", color=gabby_gums_dark_green())
+        msg = ["The following users are being ignored or redirected to alternative log channels by Gabby Gums:"]
+        _ignored_users = await db.get_users_overrides(self.bot.db_pool, ctx.guild.id)
+        for ignored_user in _ignored_users:
+            if ignored_user['log_ch'] is not None:
+                msg.append(f"Events from <@{ignored_user['user_id']}> are being redirected to <#{ignored_user['log_ch']}>.")
+            else:
+                msg.append(f"Events from <@{ignored_user['user_id']}> are being ignored.")
+        embed.description = "\n".join(msg)
+        await ctx.send(embed=embed)
+
+
+    @user_overrides.command(name="ignore", brief="Make Gabby Gums ignore a member")
+    async def ignore(self, ctx: commands.Context, member: discord.Member):
+
+        await db.add_user_override(self.bot.db_pool, ctx.guild.id, member.id, None)
+        embed = discord.Embed(color=gabby_gums_dark_green(),
+                              description=f"Events from <@{member.id}> will now be ignored.")
+        await ctx.send(embed=embed)
+
+
+    @user_overrides.command(name="redirect", brief="Make a specific users logs be redirected to a specific log channel")
+    async def redirect(self, ctx: commands.Context, member: discord.Member, channel: discord.TextChannel):
+
+        await db.add_user_override(self.bot.db_pool, ctx.guild.id, member.id, channel.id)
+        embed = discord.Embed(color=gabby_gums_dark_green(),
+                              description=f"Events from <@{member.id}> have been redirected to <#{channel.id}>.\n\n\n"
+                                          f"Please note, that if this user was previously ignored, that will no longer be the case.")
+        await ctx.send(embed=embed)
+
+
+    @user_overrides.command(name="remove", brief="Stop ignoring or redirecting a member")
+    async def remove(self, ctx: commands.Context, member: discord.Member):
+
+        await db.remove_user_override(self.bot.db_pool, ctx.guild.id, member.id)
+        await ctx.send("<@{}> - {}#{} is no longer being ignored or redirected.".format(member.id, member.name, member.discriminator))
+
+        embed = discord.Embed(color=gabby_gums_dark_green(),
+                              description=f"Events from <@{member.id}> are no longer being ignored or redirected.\n\n\n"
+                                          f"Please note, that if this user was previously ignored, that will no longer be the case.")
+        await ctx.send(embed=embed)
+
+    # endregion
+
 
 def setup(bot):
     bot.add_cog(Configuration(bot))
