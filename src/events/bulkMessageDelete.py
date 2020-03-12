@@ -26,6 +26,7 @@ import db
 # import utils
 import utils.chatArchiver as chatArchiver
 from utils.discordMarkdownParser import markdown
+import eCommands
 
 if TYPE_CHECKING:
     from bot import GGBot
@@ -312,9 +313,9 @@ class Archive(commands.Cog):
     @commands.cooldown(rate=1, per=10, type=commands.BucketType.guild)
     @commands.max_concurrency(1, per=commands.BucketType.guild, wait=False)
     @commands.is_owner()
-    @commands.command(name="txtarc",
-                      brief="Recod.",
-                      description="adw")
+    @eCommands.command(name="txtarc",
+                       brief="Test command for archiving. Creates a txt file instead of a HTML file.",
+                       description="Test command for archiving. Creates a txt file instead of a HTML file.")
     async def txt_archive(self, ctx: commands.Context, number_of_msg: int = 1000):
         channel: discord.TextChannel = ctx.channel
 
@@ -369,10 +370,17 @@ class Archive(commands.Cog):
     @commands.has_permissions(manage_messages=True)
     @commands.cooldown(rate=1, per=10, type=commands.BucketType.guild)
     @commands.max_concurrency(1, per=commands.BucketType.guild, wait=False)
-    @commands.command(name="archive",
-                      brief="Creates an archive file for the number of messages specified.",
-                      description="Creates an archive file for the number of messages specified.")
+    @eCommands.command(name="archive",
+                       brief="Creates an archive file for the number of messages specified.",
+                       description="Creates an archive file for the number of messages specified.",
+                       usage="<# of messages to archive> [Channel] [Message ID]",
+                       examples=["100", "50 #main", "75 123456789123456789", "75 #main 987654321987654321"])
     async def archive(self, ctx: commands.Context, number_of_msg: int, channel: Optional[discord.TextChannel], message_id: Optional[int]):
+        """This command creates a HTML archive of a discord channel. To use this command, you must include the number of messages you wish to archive.
+
+        By default it archives the channel the command is used in starting from the last posted message.
+        However, you may specify what channel you want to archive by including the channel in the `[Channel]` field.
+        Additionally, if you have included a channel, you may also choose a different message to start archiving from by including the message ID in the `[Message ID]` field."""
 
         if channel is None:
             channel: discord.TextChannel = ctx.channel
@@ -441,11 +449,16 @@ class Archive(commands.Cog):
     # TODO: Move to a commands cog once CompositeMessage is in it's own file.
     @commands.cooldown(rate=1, per=10, type=commands.BucketType.guild)
     @commands.max_concurrency(1, per=commands.BucketType.guild, wait=False)
-    @commands.command(name="verify_archive",
-                      aliases=["verify", "va"],
-                      brief="Verifies that an archive file has not been tampered with.",
-                      description="Verifies that an archive file has not been tampered with.")
+    @eCommands.command(name="verify_archive",
+                       aliases=["verify", "va"],
+                       brief="Verifies that an archive file has not been tampered with.",
+                       # description="Verifies that an archive file has not been tampered with.",
+                       examples=[""])
     async def verify_cmd(self, ctx: commands.Context):
+        """This command is able to verify that an archive file has not been tampered with or altered in any way. This can be very useful for using the archive files to file reports with other server administrators.
+
+        To use this command, simply upload an archive file while using the command.
+        """
         message: discord.Message = ctx.message
         if len(message.attachments) == 0:
             await ctx.send("No archive file uploaded!")
