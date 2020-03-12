@@ -17,6 +17,7 @@ import db
 from miscUtils import prettify_permission_name
 from uiElements import StringReactPage, BoolPage
 from GuildConfigs import GuildLoggingConfig, EventConfig, GuildConfigDocs
+from utils.moreColors import gabby_gums_dark_green
 
 if TYPE_CHECKING:
     from bot import GGBot
@@ -328,7 +329,7 @@ class Configuration(commands.Cog):
                                                "and all configured settings such as Log channels, enabled/disabled events, ignored users/channels/categories.\n\n"
                                                "This action **can not** be undone and you will have to reset up Gabby Gums from the beginning.\n\n"
                                                "Click the ✅ to continue\nclick the ❌ to cancel.",
-                                   color=discord.Color.from_rgb(80, 135, 135))
+                                   color=gabby_gums_dark_green())
         conf_page = BoolPage(embed=conf_embed)
 
         confirmation = await conf_page.run(ctx)
