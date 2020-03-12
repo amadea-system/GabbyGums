@@ -58,7 +58,6 @@ class EmbedHelp(dpy_cmds.DefaultHelpCommand):
     def get_formated_commands(self, commands, *, max_size=None) -> Optional[List[str]]:
         """
         Formats a list of commands with their command signature and short_doc while preserving a max width.
-        Returns a dict suitable for adding to a field.  #TODO: Make it return a dict, or give up on that idea.
         """
 
         if not commands:
@@ -94,6 +93,16 @@ class EmbedHelp(dpy_cmds.DefaultHelpCommand):
             embed.add_field(name="Examples:", value=example_msg, inline=False)
 
         return embed
+
+    def _get_ending_note(self, group: Optional[dpy_cmds.Group] = None) -> str:
+        """Returns help command's ending note. This is mainly useful to override for i18n purposes."""
+        command_name = self.invoked_with
+        if group and len(group.commands) > 0:
+            return "Type {0}{1} command for more info on a command.\n" \
+               "You can also type {0}{1} <Sub-Command> for more info on a sub-command.".format(self.clean_prefix, command_name)
+
+        return "Type {0}{1} command for more info on a command.\n" \
+               "You can also type {0}{1} category for more info on a category.".format(self.clean_prefix, command_name)
 
     async def send_bot_help(self, mapping):
         ctx: dpy_cmds.Context = self.context
@@ -172,7 +181,7 @@ class EmbedHelp(dpy_cmds.DefaultHelpCommand):
 
         embed = self.add_examples(group, embed)
 
-        note = self.get_ending_note()
+        note = self._get_ending_note(group)
         if note:
             embed.add_field(name="\N{Zero Width Space}", value=note, inline=False)
 
