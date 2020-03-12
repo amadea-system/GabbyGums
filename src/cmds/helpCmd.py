@@ -11,7 +11,7 @@ Part of the Gabby Gums Discord Logger.
 import logging
 import itertools
 
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 import discord
 from discord.ext import commands as dpy_cmds
 
@@ -21,24 +21,23 @@ log = logging.getLogger(__name__)
 
 support_link = "https://discord.gg/3Ugade9"
 
+help_embed_color = 0x9932CC
+
 
 class EmbedHelp(dpy_cmds.DefaultHelpCommand):
-
-    def help_embed(self) -> discord.Embed:
-        return discord.Embed(title='Gabby Gums Help', color=0x9932CC)
 
     async def send_embed(self, embed: discord.embeds):
 
         dest: discord.abc.Messageable = self.get_destination()
         await dest.send(embed=embed)
 
-    def get_command_formatting_for_embed(self, command: dpy_cmds.Command) -> List[str]:
-        """A utility function to format the non-indented block of commands and groups.
+    def get_command_embeded_description(self, command: dpy_cmds.Command) -> List[str]:
+        """A utility function to format the embed description block of commands and groups.
 
         Parameters
         ------------
         command: :class:`Command`
-            The command to format.
+            The command/group to format.
         """
         msg = []
         if command.description:
@@ -57,16 +56,18 @@ class EmbedHelp(dpy_cmds.DefaultHelpCommand):
         return msg
 
     def get_formated_commands(self, commands, *, max_size=None) -> Optional[List[str]]:
-        """Indents a list of commands after the specified heading."""
+        """
+        Formats a list of commands with their command signature and short_doc while preserving a max width.
+        Returns a dict suitable for adding to a field.  #TODO: Make it return a dict, or give up on that idea.
+        """
 
         if not commands:
             return
 
         msg = []
-        # msg.append(heading)
         max_size = max_size or self.get_max_size(commands)
 
-        get_width = discord.utils._string_width
+        get_width = discord.utils._string_width   # TODO: Stop using a protected member.
         for command in commands:
             name = command.name
             width = max_size - (get_width(name) - len(name))
@@ -77,21 +78,19 @@ class EmbedHelp(dpy_cmds.DefaultHelpCommand):
         return msg
 
     def add_examples(self, command: Union[dpy_cmds.Group, dpy_cmds.Command], embed: discord.Embed) -> discord.Embed:
+        """Adds any examples the command/group may have as a field """
 
         if hasattr(command, 'examples') and len(command.examples) > 0:
-            # log.info("has examples attr")
             parent = command.full_parent_name
             alias = command.name if not parent else parent + ' ' + command.name
 
             command_signature = f"{self.clean_prefix}{alias}"
             example_msg = []
             for example in command.examples:
-                # log.info(f"Adding: `{command_signature} {example}`")
                 example_msg.append(f"`{command_signature} {example}`")
 
             example_msg.append("\n")
             example_msg = "\n".join(example_msg)
-            # log.info(f"Final fiels: {example_msg}")
             embed.add_field(name="Examples:", value=example_msg, inline=False)
 
         return embed
@@ -108,7 +107,7 @@ class EmbedHelp(dpy_cmds.DefaultHelpCommand):
                             f"\nIf you need assistance, please join our support server @ {support_link} and we will be happy to help you.")
             return
 
-        embed = self.help_embed()
+        embed = discord.Embed(title='Gabby Gums Help', color=help_embed_color)
 
         embed.add_field(name="Who can use Gabby Gums",
                         value="Anyone!\n"
@@ -148,9 +147,11 @@ class EmbedHelp(dpy_cmds.DefaultHelpCommand):
         await dest.send(embed=embed)
 
 
-    async def send_command_help(self, command):
-        embed_descrip = self.get_command_formatting_for_embed(command)
-        embed = self.help_embed()
+    async def send_command_help(self, command: dpy_cmds.Command):
+        embed_descrip = self.get_command_embeded_description(command)
+        command_name = command.qualified_name
+
+        embed = discord.Embed(title=f'{command_name}  -  Gabby Gums Help', color=help_embed_color)
         embed.description = "\n".join(embed_descrip)
 
         embed = self.add_examples(command, embed)
@@ -158,9 +159,10 @@ class EmbedHelp(dpy_cmds.DefaultHelpCommand):
         await self.send_embed(embed)
 
 
-    async def send_group_help(self, group):
-        embed = self.help_embed()
-        embed_desc = self.get_command_formatting_for_embed(group)
+    async def send_group_help(self, group: dpy_cmds.Group):
+        command_name = group.qualified_name
+        embed = discord.Embed(title=f'{command_name}  -  Gabby Gums Help', color=help_embed_color)
+        embed_desc = self.get_command_embeded_description(group)
         embed.description = "\n".join(embed_desc)
 
         filtered = await self.filter_commands(group.commands, sort=self.sort_commands)
