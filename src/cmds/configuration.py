@@ -356,6 +356,11 @@ class Configuration(commands.Cog):
                      usage='<command> [Member] [Channel]',
                      examples=["list", "redirect @Hibiki #Hibiki-logs", "ignore @Hibiki"])
     async def user_overrides(self, ctx: commands.Context):
+        """This command allows you to have Gabby Gums ignore events from users and/or redirect the logs for those events to different log channels.
+        For example, you could use this to have gabby gums ignore a bot that's filling up your logs with spam or perhaps redirect the logs of moderators or users on probation.
+
+        Please be aware that these settings override the event configurations.
+        So if for instance were to have all the delete logs going to a channel called #delete-logs and you set up a user override for a user named Bob to redirect their logs to #bob-log, all of logs regarding Bob, including their deleted messages would go to #bob-log (of course everyone else's logs would go to where ever they normally would have)."""
         if ctx.invoked_subcommand is None:
             await ctx.send_help(self.user_overrides)
 
