@@ -41,3 +41,21 @@ async def get_pk_system_from_userid(user_id: int) -> Optional[Dict]:
     except aiohttp.ClientError as e:
         raise CouldNotConnectToPKAPI  # Really not strictly necessary, but it makes the code a bit nicer I think.
 
+
+async def get_pk_message(message_id: int) -> Optional[Dict]:
+    """Attempts to retrieve details on a proxied/pre-proxied message"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get('https://api.pluralkit.me/msg/{}'.format(message_id)) as r:
+                if r.status == 200:  # We received a valid response from the PK API. The message is probably a pre-proxied message.
+                    # TODO: Remove logging once bugs are worked out.
+                    logging.debug(f"Message {message_id} is still on the PK api.")
+                    # Convert the JSON response to a dict, Cache the details of the proxied message, and then bail.
+                    pk_response = await r.json()
+                    return pk_response
+
+    except aiohttp.ClientError as e:
+        raise CouldNotConnectToPKAPI
+
+
+

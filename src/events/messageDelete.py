@@ -16,6 +16,7 @@ from discord.ext import commands
 import db
 import miscUtils
 from embeds import deleted_message_embed
+from utils.pluralKit import get_pk_message, CouldNotConnectToPKAPI
 
 if TYPE_CHECKING:
     from bot import GGBot
@@ -77,25 +78,16 @@ class MemberUpdate(commands.Cog):
             author_id = None
             author = None
 
-        # Check with PK API Last to reduce PK server load.
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get('https://api.pluralkit.me/msg/{}'.format(payload.message_id)) as r:
-                    if r.status == 200:  # We received a valid response from the PK API. The message is probably a pre-proxied message.
-                        # TODO: Remove logging once bugs are worked out.
-                        logging.debug(
-                            f"Message {payload.message_id} is still on the PK api. updating caches and aborting logging.")
-                        # Convert the JSON response to a dict, Cache the details of the proxied message, and then bail.
-                        pk_response = await r.json()
-                        if self.verify_message_is_preproxy_message(payload.message_id, pk_response):
-                            # We have confirmed that the message is a pre-proxied message.
-                            await self.cache_pk_message_details(payload.guild_id, pk_response)
-                            await cleanup_message_cache()
-                            return  # Message was a pre-proxied message deleted by PluralKit. Return instead of logging message.
+            pk_msg = await get_pk_message(payload.message_id)
+            if pk_msg is not None and self.verify_message_is_preproxy_message(payload.message_id, pk_msg):
+                # We have confirmed that the message is a pre-proxied message.
+                await self.cache_pk_message_details(payload.guild_id, pk_msg)
+                await cleanup_message_cache()
+                return  # Message was a pre-proxied message deleted by PluralKit. Return instead of logging message.
 
-        except aiohttp.ClientError as e:
-            logging.warning(
-                "Could not connect to PK server with out errors. Assuming message should be logged.\n{}".format(e))
+        except CouldNotConnectToPKAPI:
+            logging.warning("Could not connect to PK server with out errors. Assuming message should be logged.")
 
         if db_cached_message is not None and db_cached_message.pk_system_account_id is not None:
             pk_system_owner = self.bot.get_user(db_cached_message.pk_system_account_id)
