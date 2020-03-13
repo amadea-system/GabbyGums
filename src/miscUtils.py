@@ -15,12 +15,13 @@ import sys
 import string
 
 from datetime import datetime, timedelta
-from typing import Union, Optional, Dict, List
+from typing import Union, Optional, Dict, List, TYPE_CHECKING
 
 import discord
 from discord.ext import commands
 
-from bot import GGBot
+if TYPE_CHECKING:
+    from bot import GGBot
 
 log = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ def split_text(text: Union[str, List], max_size: int = 2000, delimiter: str = "\
     return output
 
 
-async def log_error_msg(bot: GGBot, error_messages: Optional[Union[str, List[str], Exception]], header: Optional[str] = None, code_block: bool = False) -> bool:
+async def log_error_msg(bot: 'GGBot', error_messages: Optional[Union[str, List[str], Exception]], header: Optional[str] = None, code_block: bool = False) -> bool:
     """
     Attempts to send a message to the Global Error Discord Channel.
 

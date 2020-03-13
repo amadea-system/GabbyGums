@@ -4,8 +4,7 @@
 import sys
 import logging
 import traceback
-from typing import Optional, Dict, Tuple, List
-
+from typing import Optional, Dict, Tuple, List, Union
 
 import discord
 from discord.ext import commands, tasks
@@ -13,6 +12,7 @@ import asyncpg
 
 import db
 from utils.errors import handle_permissions_error
+from miscUtils import log_error_msg
 
 log = logging.getLogger(__name__)
 
@@ -164,5 +164,22 @@ class GGBot(commands.Bot):
                 return True
         return False
     # endregion
+
+
+    async def is_pk_here(self, guild: discord.Guild) -> bool:
+        """Checks if Plural Kit exists on the server. Returns bool"""
+
+        pk_user: Union[discord.User, discord.Member] = guild.get_member(self.pk_id)
+        if pk_user is not None:
+            return True
+
+        # Couldn't find PK in cache, attempting fetch.
+        try:
+            pk_user = await guild.fetch_member(self.pk_id)
+            if pk_user is not None:
+                await log_error_msg(self, f"Found PK with **Fetch** in {guild.name} ({guild.id})")
+
+        except discord.NotFound:
+            await log_error_msg(self, f"Could not find pk in {guild.name} ({guild.id})")
 
 
