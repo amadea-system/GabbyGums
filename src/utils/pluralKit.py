@@ -17,6 +17,14 @@ class CouldNotConnectToPKAPI(Exception):
     pass
 
 
+class PkApi503Error(Exception):
+    pass
+
+
+class UnknownPKError(Exception):
+    pass
+
+
 async def get_pk_system_from_userid(user_id: int) -> Optional[Dict]:
 
     try:
@@ -37,6 +45,8 @@ async def get_pk_system_from_userid(user_id: int) -> Optional[Dict]:
                     # No PK Account found.
                     log.info("No PK Account found.")
                     return None
+                else:
+                    raise UnknownPKError(f"Received Status Code: {r.status} ({r.reason}) for /a/{user_id}")
 
     except aiohttp.ClientError as e:
         raise CouldNotConnectToPKAPI  # Really not strictly necessary, but it makes the code a bit nicer I think.
@@ -53,6 +63,11 @@ async def get_pk_message(message_id: int) -> Optional[Dict]:
                     # Convert the JSON response to a dict, Cache the details of the proxied message, and then bail.
                     pk_response = await r.json()
                     return pk_response
+                elif r.status == 404:
+                    # msg was not a proxied message
+                    return None
+                else:
+                    raise UnknownPKError(f"Received Status Code: {r.status} ({r.reason}) for /msg/{message_id}")
 
     except aiohttp.ClientError as e:
         raise CouldNotConnectToPKAPI
