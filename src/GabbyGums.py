@@ -300,7 +300,7 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
             async with session.get('https://api.pluralkit.me/msg/{}'.format(payload.message_id)) as r:
                 if r.status == 200:  # We received a valid response from the PK API. The message is probably a pre-proxied message.
                     # TODO: Remove logging once bugs are worked out.
-                    logging.info(f"Message {payload.message_id} is still on the PK api. updating caches and aborting logging.")
+                    logging.debug(f"Message {payload.message_id} is still on the PK api. updating caches and aborting logging.")
                     # Convert the JSON response to a dict, Cache the details of the proxied message, and then bail.
                     pk_response = await r.json()
                     if verify_message_is_preproxy_message(payload.message_id, pk_response):
@@ -411,7 +411,7 @@ async def cache_pk_message_details(guild_id: int, pk_response: Dict):
         error_msg.append(msg)
 
     # TODO: Remove verbose Logging once feature deemed to be stable .
-    logging.info(f"Updating msg: {message_id} with Sender ID: {sender_discord_id}, System ID: {system_pk_id}, Member ID: {member_pk_id}")
+    logging.debug(f"Updating msg: {message_id} with Sender ID: {sender_discord_id}, System ID: {system_pk_id}, Member ID: {member_pk_id}")
     await db.update_cached_message_pk_details(client.db_pool, guild_id, message_id, system_pk_id, member_pk_id, sender_discord_id)
 
     if len(error_msg) > 0:
@@ -426,12 +426,11 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
         if "guild_id" not in payload.data:
             return  # We are in a DM, Don't log the message
 
-        db_cached_message = await db.get_cached_message(client.db_pool, payload.data['guild_id'], payload.message_id)
-
         after_msg = payload.data['content']
-        guild_id = int(payload.data["guild_id"])
+        guild_id = int(payload.data["guild_id"])  # guild_id needs to be typecast to int since raw payload id's are str.
         message_id = payload.message_id
 
+        db_cached_message = await db.get_cached_message(client.db_pool, guild_id, payload.message_id)
         if payload.cached_message is not None:
             before_msg = payload.cached_message.content
             author = payload.cached_message.author
@@ -439,8 +438,10 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
             channel_id = payload.cached_message.channel.id
         else:
             before_msg = db_cached_message.content if db_cached_message is not None else None
-            author_id = payload.data['author']['id']
-            channel_id = payload.data["channel_id"]
+
+            # author_id needs to be typecast to int since raw payload id's are str.
+            author_id = int(payload.data['author']['id'])
+            channel_id = payload.channel_id
             author = None
 
         if client.user.id == author_id:
@@ -468,7 +469,7 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
             # TODO: Consider removing to prevent potential API call
             author = client.get_user(author_id)
             if author is None:
-                print("get_user failed")
+                logging.warning(f"get_user failed in raw msg_edit: {author_id}")
                 author = await client.fetch_user(author_id)
 
         embed = embeds.edited_message(author_id, author.name, author.discriminator, channel_id, before_msg, after_msg, message_id, guild_id)
@@ -478,7 +479,7 @@ async def on_raw_message_edit(payload: discord.RawMessageUpdateEvent):
         await client.send_log(log_channel, event_type, embed=embed)
 
         if db_cached_message is not None:
-            await db.update_cached_message(client.db_pool, payload.data['guild_id'], payload.message_id, after_msg)
+            await db.update_cached_message(client.db_pool, guild_id, payload.message_id, after_msg)
 
 
 @client.event

@@ -143,7 +143,8 @@ class GGBot(commands.Bot):
         Returns (True, TextChannel_ID) if the user is redirected
         Returns (False, None) If there are no overrides at all
         """
-        log_ch = None
+        guild_id = int(guild_id)
+        user_id = int(user_id)
         user_overrides = await db.get_users_overrides(self.db_pool, guild_id)
         for user in user_overrides:
             if user['user_id'] == user_id:
