@@ -18,10 +18,10 @@ from typing import TYPE_CHECKING, Optional, Dict, List, Union
 import discord
 from discord.ext import commands
 
-from embeds import member_join, member_leave, member_kick
-from miscUtils import send_long_msg, get_audit_logs, MissingAuditLogPermissions
 import db
-from utils.pluralKit import get_pk_system_from_userid, CouldNotConnectToPKAPI
+from embeds import member_join, member_leave, member_kick
+from miscUtils import send_long_msg, get_audit_logs, MissingAuditLogPermissions, log_error_msg
+from utils.pluralKit import get_pk_system_from_userid, CouldNotConnectToPKAPI, UnknownPKError
 
 if TYPE_CHECKING:
     from bot import GGBot
@@ -50,6 +50,9 @@ class MemberJoinLeave(commands.Cog):
             pk_response = await get_pk_system_from_userid(member.id)
         except CouldNotConnectToPKAPI:
             pk_response = None  # add warning message to embed or maybe retry later?
+        except UnknownPKError as e:
+            await log_error_msg(self.bot, e)
+            pk_response = None
 
         await self.handle_member_join(member, pk_response)
         await self.check_if_pk_banned(member, pk_response)

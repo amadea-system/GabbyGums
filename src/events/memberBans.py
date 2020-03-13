@@ -19,10 +19,11 @@ from typing import TYPE_CHECKING, Optional, Dict, List, Union
 import discord
 from discord.ext import commands
 
+import miscUtils
 from embeds import member_ban, member_unban
 from miscUtils import get_audit_logs, MissingAuditLogPermissions, split_text
 import db
-from utils.pluralKit import get_pk_system_from_userid, CouldNotConnectToPKAPI
+from utils.pluralKit import get_pk_system_from_userid, CouldNotConnectToPKAPI, UnknownPKError
 
 if TYPE_CHECKING:
     from bot import GGBot
@@ -46,6 +47,11 @@ class MemberBans(commands.Cog):
         except CouldNotConnectToPKAPI:
             pk_response = None
             system_id = None  # add warning message to embed or maybe retry later?
+        except UnknownPKError as e:
+            await miscUtils.log_error_msg(self.bot, e)
+            pk_response = None
+            system_id = None
+
 
         if system_id is not None and pk_response is not None:
             await db.add_banned_system(self.bot.db_pool, guild.id, system_id, user.id)
@@ -93,6 +99,10 @@ class MemberBans(commands.Cog):
         except CouldNotConnectToPKAPI:
             pk_response = None
             system_id = None  # add warning message to embed or maybe retry later?
+        except UnknownPKError as e:
+            await miscUtils.log_error_msg(self.bot, e)
+            pk_response = None
+            system_id = None
 
         if system_id is not None and pk_response is not None:
 

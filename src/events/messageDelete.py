@@ -16,7 +16,7 @@ from discord.ext import commands
 import db
 import miscUtils
 from embeds import deleted_message_embed
-from utils.pluralKit import get_pk_message, CouldNotConnectToPKAPI
+from utils.pluralKit import get_pk_message, CouldNotConnectToPKAPI, UnknownPKError
 
 if TYPE_CHECKING:
     from bot import GGBot
@@ -88,6 +88,8 @@ class MemberUpdate(commands.Cog):
 
         except CouldNotConnectToPKAPI:
             logging.warning("Could not connect to PK server with out errors. Assuming message should be logged.")
+        except UnknownPKError as e:
+            await miscUtils.log_error_msg(self.bot, e)
 
         if db_cached_message is not None and db_cached_message.pk_system_account_id is not None:
             pk_system_owner = self.bot.get_user(db_cached_message.pk_system_account_id)
