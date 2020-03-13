@@ -47,8 +47,8 @@ def about_message() -> discord.Embed:
     return embed
 
 
-def edited_message(author_id, author_name: str, author_discrim, channel_id, before_msg: str, after_msg: str,
-                   message_id: str, guild_id) -> discord.Embed:
+def edited_message_embed(author_id, author_name: str, author_discrim, channel_id, before_msg: str, after_msg: str,
+                         message_id: str, guild_id) -> discord.Embed:
 
     before_msg = before_msg if before_msg else "Message not in the cache."
 
@@ -81,9 +81,9 @@ def edited_message(author_id, author_name: str, author_discrim, channel_id, befo
     return embed
 
 
-def deleted_message(message_content: Optional[str], author: Optional[discord.Member], channel_id: int, message_id: int = -1,
-                    webhook_info: Optional[CachedMessage] = None, pk_system_owner: Optional[discord.Member] = None,
-                    cached: bool = True) -> discord.Embed:
+def deleted_message_embed(message_content: Optional[str], author: Optional[discord.Member], channel_id: int, message_id: int = -1,
+                          webhook_info: Optional[CachedMessage] = None, pk_system_owner: Optional[discord.Member] = None,
+                          cached: bool = True) -> discord.Embed:
 
     # If the webhook_info is none, create dummy object to make if's neater
     if webhook_info is None:
@@ -128,6 +128,9 @@ def deleted_message(message_content: Optional[str], author: Optional[discord.Mem
             embed.add_field(name="Linked Discord Account:",
                             value=f"<@{pk_system_owner.id}> - {pk_system_owner.name}#{pk_system_owner.discriminator}",
                             inline=False)
+
+        if message_content == "":  # Make sure we don't end up throwing an error due to an empty field value.
+            message_content = "None"
 
         if len(message_content) > 1024:
             msg_cont_1, msg_cont_2 = split_message(message_content)

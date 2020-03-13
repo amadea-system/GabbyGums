@@ -17,18 +17,23 @@ from utils.errors import handle_permissions_error
 log = logging.getLogger(__name__)
 
 extensions = (
+    # -- Command Extensions -- #
+    'cmds.configuration',
+    'cmds.dev',
     'cmds.helpCmd',
-    'events.memberJoinLeave',
-    'events.memberUpdate',
-    'events.userUpdate',
+    'cmds.inviteManagement',
+    'cmds.utilities',
+
+    # -- Event Extensions -- #
     'events.bulkMessageDelete',
     'events.channelEvents',
-    'events.memberBans',
     'events.inviteEvents',
-    'cmds.utilities',
-    'cmds.dev',
-    'cmds.configuration',
-    'cmds.inviteManagement',
+    'events.memberBans',
+    'events.memberJoinLeave',
+    'events.memberUpdate',
+    'events.messageDelete',
+    'events.messageEdit',
+    'events.userUpdate',
 )
 
 
