@@ -171,6 +171,7 @@ class GGBot(commands.Bot):
 
         pk_user: Union[discord.User, discord.Member] = guild.get_member(self.pk_id)
         if pk_user is not None:
+            log.info(f"Found PK with get in {guild.name} ({guild.id})")
             return True
 
         # Couldn't find PK in cache, attempting fetch.
@@ -178,8 +179,10 @@ class GGBot(commands.Bot):
             pk_user = await guild.fetch_member(self.pk_id)
             if pk_user is not None:
                 await log_error_msg(self, f"Found PK with **Fetch** in {guild.name} ({guild.id})")
+                return True
 
         except discord.NotFound:
             await log_error_msg(self, f"Could not find pk in {guild.name} ({guild.id})")
+            return False
 
 

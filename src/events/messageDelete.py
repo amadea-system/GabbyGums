@@ -78,6 +78,11 @@ class MemberUpdate(commands.Cog):
             author_id = None
             author = None
 
+        # Not doing anything with this check yet. Leaving it here for now to ensure that it is reliable.
+        guild: discord.Guild = self.bot.get_guild(payload.guild_id)
+        if guild is not None:
+            pk_is_here = await self.bot.is_pk_here(guild)
+
         try:
             pk_msg = await get_pk_message(payload.message_id)
             if pk_msg is not None and self.verify_message_is_preproxy_message(payload.message_id, pk_msg):
