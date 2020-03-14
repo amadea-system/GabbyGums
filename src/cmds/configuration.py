@@ -14,7 +14,7 @@ from discord.ext import commands
 import eCommands
 
 import db
-from miscUtils import prettify_permission_name
+from miscUtils import prettify_permission_name, check_permissions
 from uiElements import StringReactPage, BoolPage
 from GuildConfigs import GuildLoggingConfig, EventConfig, GuildConfigDocs
 from utils.moreColors import gabby_gums_dark_green
@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 guild_config_docs = GuildConfigDocs()
 
+VoiceOrTextChannel = Union[discord.TextChannel, discord.VoiceChannel]
 
 # region Embed Getters
 async def get_event_configuration_embed(ctx: commands.Context, event_configs: GuildLoggingConfig, final: bool = False) -> discord.Embed:
@@ -366,7 +367,7 @@ class Configuration(commands.Cog):
 
 
     @user_overrides.command(name="list", brief="Lists users that are ignored or being redirected")
-    async def _list(self, ctx: commands.Context):
+    async def u_list(self, ctx: commands.Context):
         embed = discord.Embed(title="Ignored & Redirected Users", color=gabby_gums_dark_green())
         msg = ["The following users are being ignored or redirected to alternative log channels by Gabby Gums:"]
         _ignored_users = await db.get_users_overrides(self.bot.db_pool, ctx.guild.id)
@@ -380,7 +381,7 @@ class Configuration(commands.Cog):
 
 
     @user_overrides.command(name="ignore", brief="Make Gabby Gums ignore a member")
-    async def ignore(self, ctx: commands.Context, member: discord.Member):
+    async def u_ignore(self, ctx: commands.Context, member: discord.Member):
 
         await db.add_user_override(self.bot.db_pool, ctx.guild.id, member.id, None)
         embed = discord.Embed(color=gabby_gums_dark_green(),
@@ -389,20 +390,103 @@ class Configuration(commands.Cog):
 
 
     @user_overrides.command(name="redirect", brief="Make a specific users logs be redirected to a specific log channel")
-    async def redirect(self, ctx: commands.Context, member: discord.Member, channel: discord.TextChannel):
+    async def u_redirect(self, ctx: commands.Context, member: discord.Member, channel: discord.TextChannel):
 
-        await db.add_user_override(self.bot.db_pool, ctx.guild.id, member.id, channel.id)
+        missing_perms = check_permissions(channel)
+        if len(missing_perms) > 0:
+            msg = [f"Could not set the log channel to <#{channel.id}>.",
+                   f"Gabby Gums is missing the following critical permissions in <#{channel.id}> which would prevent log messages from being sent:"]
+            for perm in missing_perms:
+                msg.append(f"**{prettify_permission_name(perm)}**")
+            msg.append("\nPlease fix the permissions and try again or choose a different channel.")
+
+        else:
+            await db.add_user_override(self.bot.db_pool, ctx.guild.id, member.id, channel.id)
+            msg = [f"Events from <@{member.id}> have been redirected to <#{channel.id}>.\n",
+                   f"Please note, that if this user was previously ignored, that will no longer be the case."]
+
         embed = discord.Embed(color=gabby_gums_dark_green(),
-                              description=f"Events from <@{member.id}> have been redirected to <#{channel.id}>.\n\n\n"
-                                          f"Please note, that if this user was previously ignored, that will no longer be the case.")
+                              description="\n".join(msg))
+
         await ctx.send(embed=embed)
 
 
     @user_overrides.command(name="remove", brief="Stop ignoring or redirecting a member")
-    async def remove(self, ctx: commands.Context, member: discord.Member):
+    async def u_remove(self, ctx: commands.Context, member: discord.Member):
 
         embed = discord.Embed(color=gabby_gums_dark_green(),
                               description=f"Events from <@{member.id}> will no longer be ignored or redirected.\n")
+        await ctx.send(embed=embed)
+
+    # endregion
+
+    # region Ignore/Redirect Channel Commands
+    # ----- Ignore Channel Commands ----- #
+    @commands.has_permissions(manage_messages=True)
+    @commands.guild_only()
+    @eCommands.group(name="channel_override", aliases=["channel_overrides", "ch_or", "ignore_channel"],
+                     brief="Ignore or Redirect logs from specific channels",
+                     description="Allows you to configure Gabby Gums to ignore or redirect logs for specific channels.",
+                     usage='<Command> [Channel] [Log Channel]')
+    async def channel_overide(self, ctx: commands.Context):
+        if ctx.invoked_subcommand is None:
+            await ctx.send_help(self.channel_overide)
+
+
+    @channel_overide.command(name="list", brief="Lists channels that are ignored or being redirected")
+    async def ch_list(self, ctx: commands.Context):
+
+        channel_overrides = await db.get_channel_overrides(self.bot.db_pool, ctx.guild.id)
+        if len(channel_overrides) > 0:
+            msg = ["The following channels are being ignored or having their events redirected to alternative log channels by Gabby Gums:"]
+            for ch_override in channel_overrides:
+                if ch_override['log_ch'] is not None:
+                    msg.append(f"Events from <#{ch_override['channel_id']}> are being redirected to <#{ch_override['log_ch']}>.")
+                else:
+                    msg.append(f"Events from <#{ch_override['channel_id']}> are being ignored.")
+        else:
+            msg = ["No channels are being ignored or having their events redirected."]
+
+        embed = discord.Embed(title="Ignored & Redirected Channels", description="\n".join(msg), color=gabby_gums_dark_green())
+        await ctx.send(embed=embed)
+
+
+    @channel_overide.command(name="ignore", brief="Make Gabby Gums ignore a channel")
+    async def ch_ignore(self, ctx: commands.Context, channel: VoiceOrTextChannel):
+
+        await db.add_channel_override(self.bot.db_pool, ctx.guild.id, channel.id, None)
+        embed = discord.Embed(color=gabby_gums_dark_green(),
+                              description=f"Events that occur in <#{channel.id}> will now be ignored.")
+        await ctx.send(embed=embed)
+
+
+    @channel_overide.command(name="redirect", brief="Make a specific channels logs be redirected to a specific log channel")
+    async def ch_redirect(self, ctx: commands.Context, channel: VoiceOrTextChannel, log_channel: discord.TextChannel):
+
+        missing_perms = check_permissions(log_channel)
+        if len(missing_perms) > 0:
+            msg = [f"Could not set the log channel to <#{log_channel.id}>.",
+                   f"Gabby Gums is missing the following critical permissions in <#{log_channel.id}> which would prevent log messages from being sent:"]
+            for perm in missing_perms:
+                msg.append(f"**{prettify_permission_name(perm)}**")
+            msg.append("\nPlease fix the permissions and try again or choose a different channel.")
+
+        else:
+            await db.add_channel_override(self.bot.db_pool, ctx.guild.id, channel.id, log_channel.id)
+            msg = [f"Events that occur in <#{channel.id}> have been redirected to <#{log_channel.id}>.\n",
+                   f"Please note, that if this channel was previously ignored, that will no longer be the case."]
+
+        embed = discord.Embed(color=gabby_gums_dark_green(),
+                              description="\n".join(msg))
+        await ctx.send(embed=embed)
+
+
+    @channel_overide.command(name="remove", brief="Stop ignoring or redirecting a channel")
+    async def ch_remove(self, ctx: commands.Context, channel: VoiceOrTextChannel):
+        await db.remove_channel_override(self.bot.db_pool, ctx.guild.id, channel.id)
+
+        embed = discord.Embed(color=gabby_gums_dark_green(),
+                              description=f"Events that occur in <#{channel.id}> will no longer be ignored or redirected.\n")
         await ctx.send(embed=embed)
 
     # endregion

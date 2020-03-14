@@ -35,35 +35,31 @@ class ChannelEvents(commands.Cog):
     def __init__(self, bot: 'GGBot'):
         self.bot = bot
 
-    async def check_if_ignored(self, channel: GuildChannel) -> bool:
-        """Checks to see if the channel and/or category is ignored. Returns True if it is."""
+
+    async def get_log_channel(self, event_type: str, channel: GuildChannel):
+        """Check if the channel/category is ignored/redirected. if it isn't, we return a log_channel"""
+
         if isinstance(channel, discord.TextChannel) or isinstance(channel, discord.VoiceChannel):
-            if await self.bot.is_channel_ignored(channel.guild.id, channel.id):
-                return True
-
             if await self.bot.is_category_ignored(channel.guild.id, channel.category):
-                return True
-
-        if isinstance(channel, discord.CategoryChannel):
+                return None
+            log_ch = await self.bot.get_event_or_guild_logging_channel(channel.guild.id, event_type, channel_id=channel.id)
+            return log_ch
+        else:  # It's a category
             if await self.bot.is_category_ignored(channel.guild.id, channel):
-                return True
+                return None
+            log_ch = await self.bot.get_event_or_guild_logging_channel(channel.guild.id, event_type)
+            return log_ch
 
-        return False
 
     @commands.Cog.listener()
     async def on_guild_channel_create(self, channel: GuildChannel):
         """Handles the 'on_guild_channel_create' event."""
         event_type = "channel_create"
 
-        log_ch = await self.bot.get_event_or_guild_logging_channel(channel.guild.id, event_type)
+        log_ch = await self.get_log_channel(event_type, channel)
         if log_ch is not None:
-            category = channel if isinstance(channel, discord.CategoryChannel) else channel.category
-            ignored = await self.check_if_ignored(category)  # Only check Category ,Channel is new so it can't be ignored.
-            if not ignored:
-                embed = await self.get_channel_create_embed(channel)
-
-                # await log_ch.send(embed=embed)
-                await self.bot.send_log(log_ch, event_type, embed=embed)
+            embed = await self.get_channel_create_embed(channel)
+            await self.bot.send_log(log_ch, event_type, embed=embed)
 
 
     async def get_channel_create_embed(self, channel: GuildChannel) -> discord.Embed:
@@ -140,13 +136,10 @@ class ChannelEvents(commands.Cog):
         """Handles the 'on_guild_channel_delete' event."""
         event_type = "channel_delete"
 
-        log_ch = await self.bot.get_event_or_guild_logging_channel(channel.guild.id, event_type)
+        log_ch = await self.get_log_channel(event_type, channel)
         if log_ch is not None:
-            ignored = await self.check_if_ignored(channel)
-            if not ignored:
-                embed = await self.get_channel_delete_embed(channel)
-                # await log_ch.send(embed=embed)
-                await self.bot.send_log(log_ch, event_type, embed=embed)
+            embed = await self.get_channel_delete_embed(channel)
+            await self.bot.send_log(log_ch, event_type, embed=embed)
 
 
     @classmethod
@@ -224,28 +217,26 @@ class ChannelEvents(commands.Cog):
         # log.info(f"{event_type} fired!")
         if before.position == after.position:  # Filter out position change spam
 
-            log_ch = await self.bot.get_event_or_guild_logging_channel(before.guild.id, event_type)
-
+            log_ch = await self.get_log_channel(event_type, after)
             if log_ch is not None:
-                ignored = await self.check_if_ignored(after)
-                if not ignored:
-                    if isinstance(before, discord.TextChannel) and isinstance(after, discord.TextChannel):
-                        embed = self.get_text_ch_update_embed(before, after)
-                        if embed is not None:
-                            # await log_ch.send(embed=embed)
-                            await self.bot.send_log(log_ch, event_type, embed=embed)
 
-                    if isinstance(before, discord.VoiceChannel) and isinstance(after, discord.VoiceChannel):
-                        embed = self.get_voice_ch_update_embed(before, after)
-                        if embed is not None:
-                            # await log_ch.send(embed=embed)
-                            await self.bot.send_log(log_ch, event_type, embed=embed)
+                if isinstance(before, discord.TextChannel) and isinstance(after, discord.TextChannel):
+                    embed = self.get_text_ch_update_embed(before, after)
+                    if embed is not None:
+                        # await log_ch.send(embed=embed)
+                        await self.bot.send_log(log_ch, event_type, embed=embed)
 
-                    if isinstance(before, discord.CategoryChannel) and isinstance(after, discord.CategoryChannel):
-                        embed = self.get_category_ch_update_embed(before, after)
-                        if embed is not None:
-                            # await log_ch.send(embed=embed)
-                            await self.bot.send_log(log_ch, event_type, embed=embed)
+                if isinstance(before, discord.VoiceChannel) and isinstance(after, discord.VoiceChannel):
+                    embed = self.get_voice_ch_update_embed(before, after)
+                    if embed is not None:
+                        # await log_ch.send(embed=embed)
+                        await self.bot.send_log(log_ch, event_type, embed=embed)
+
+                if isinstance(before, discord.CategoryChannel) and isinstance(after, discord.CategoryChannel):
+                    embed = self.get_category_ch_update_embed(before, after)
+                    if embed is not None:
+                        # await log_ch.send(embed=embed)
+                        await self.bot.send_log(log_ch, event_type, embed=embed)
 
 
     @classmethod

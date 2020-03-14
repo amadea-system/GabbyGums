@@ -561,18 +561,13 @@ class BulkMsgDelete(commands.Cog):
             msg_count += 1
             # messages.append(comp_msg)
 
-        # Check if the channel we are in is ignored. If it is, bail
-        if await self.bot.is_channel_ignored(payload.guild_id, payload.channel_id):
-            await cleanup_message_cache()
-            return
-
         # Check if the category we are in is ignored. If it is, bail
         channel: discord.TextChannel = await self.bot.get_channel_safe(payload.channel_id)
         if await self.bot.is_category_ignored(payload.guild_id, channel.category):
             await cleanup_message_cache()
             return
 
-        log_channel = await self.bot.get_event_or_guild_logging_channel(payload.guild_id, event_type)
+        log_channel = await self.bot.get_event_or_guild_logging_channel(payload.guild_id, event_type, channel_id=payload.channel_id)
         if log_channel is None:
             # Silently fail if no log channel is configured.
             await cleanup_message_cache()

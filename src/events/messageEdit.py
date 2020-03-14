@@ -61,16 +61,13 @@ class MemberUpdate(commands.Cog):
                 # The message content has not changed. This is a pin/unpin, embed edit (which would be from a bot or discord)
                 return
 
-            if await self.bot.is_channel_ignored(guild_id, channel_id):
-                return
-
             channel: discord.TextChannel = await self.bot.get_channel_safe(channel_id)
             if await self.bot.is_category_ignored(guild_id, channel.category):
                 return
 
-            log_channel = await self.bot.get_event_or_guild_logging_channel(guild_id, event_type, author_id)
+            log_channel = await self.bot.get_event_or_guild_logging_channel(guild_id, event_type, user_id=author_id, channel_id=channel_id)
             if log_channel is None:
-                # Silently fail if no log channel is configured or if the event or user is ignored.
+                # Silently fail if no log channel is configured or if the event, user, or channel is ignored.
                 return
 
             if author is None:

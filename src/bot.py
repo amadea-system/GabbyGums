@@ -93,11 +93,17 @@ class GGBot(commands.Bot):
 
     # region Get Logging Channel Methods
 
-    async def get_event_or_guild_logging_channel(self, guild_id: int, event_type: Optional[str] = None, user_id: Optional[int] = None) -> Optional[discord.TextChannel]:
+    async def get_event_or_guild_logging_channel(self, guild_id: int, event_type: Optional[str] = None, user_id: Optional[int] = None, channel_id: Optional[int] = None) -> Optional[discord.TextChannel]:
 
         # Check if there are any user overrides.
         if user_id is not None:
             has_override, override_ch_id = await self.check_user_overrides(guild_id, user_id)
+            if has_override:
+                return await self.get_channel_safe(override_ch_id) if override_ch_id is not None else None
+
+        # Then check channel overrides.
+        if channel_id is not None:
+            has_override, override_ch_id = await self.check_channel_overrides(guild_id, channel_id)
             if has_override:
                 return await self.get_channel_safe(override_ch_id) if override_ch_id is not None else None
 
@@ -133,11 +139,31 @@ class GGBot(commands.Bot):
     # region User/Chan/Cat Ignored Checkers
 
 
-    async def is_channel_ignored(self, guild_id: int, channel_id: int) -> bool:
-        _ignored_channels = await db.get_ignored_channels(self.db_pool, int(guild_id))
-        if int(channel_id) in _ignored_channels:
-            return True
-        return False
+    # async def is_channel_ignored(self, guild_id: int, channel_id: int) -> bool:
+    #     _ignored_channels = await db.get_ignored_channels(self.db_pool, int(guild_id))
+    #     if int(channel_id) in _ignored_channels:
+    #         return True
+    #     return False
+
+
+    async def check_channel_overrides(self, guild_id: int, channel_id: int) -> Tuple[bool, Optional[int]]:
+        """
+        Check to see if the channel is configures to be ignored or redirected
+
+        Returns (True, None) if the channel is ignored
+        Returns (True, TextChannel_ID) if the channel is redirected
+        Returns (False, None) If there are no overrides at all
+        """
+        guild_id = int(guild_id)
+        channel_id = int(channel_id)
+        log.info(f"passed ch_id: {channel_id} {type(channel_id)}")
+        channel_overrides = await db.get_channel_overrides(self.db_pool, guild_id)
+        log.info(f"ch_overrides: {channel_overrides}")
+        for channel in channel_overrides:
+            log.info(f"ch_id: {channel['channel_id']} {type(channel['channel_id'])}, log_ch: {channel['log_ch']} {type(channel['log_ch'])}")
+            if channel['channel_id'] == channel_id:
+                return True, channel['log_ch']
+        return False, None
 
 
     async def check_user_overrides(self, guild_id: int, user_id: int) -> Tuple[bool, Optional[int]]:

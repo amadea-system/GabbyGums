@@ -72,42 +72,6 @@ async def on_ready():
 
 
 
-# ----- Ignore Channel Commands ----- #
-@commands.has_permissions(manage_messages=True)
-@commands.guild_only()
-@client.group(name="ignore_channel", brief="Sets which channels will be ignored by Gabby Gums",
-              description="Sets which channels will be ignored by Gabby Gums",
-              usage='<command> [channel]')
-async def ignore_channel(ctx: commands.Context):
-    if ctx.invoked_subcommand is None:
-        await ctx.send_help(ignore_channel)
-
-
-@ignore_channel.command(name="list", brief="Lists which channels are currently ignored.")
-async def _list(ctx: commands.Context):
-    bot: GGBot = ctx.bot
-    _ignored_channels = await db.get_ignored_channels(bot.db_pool, ctx.guild.id)
-    if len(_ignored_channels) > 0:
-        await ctx.send("The following channels are being ignored by Gabby Gums:")
-        for channel_id in _ignored_channels:
-            await ctx.send("<#{}>".format(channel_id))
-    else:
-        await ctx.send("No channels are being ignored by Gabby Gums.")
-
-
-@ignore_channel.command(name="add", brief="Add a new channel to be ignored")
-async def add(ctx: commands.Context, channel: discord.TextChannel):
-    bot: GGBot = ctx.bot
-    await db.add_ignored_channel(bot.db_pool, ctx.guild.id, channel.id)
-    await ctx.send("<#{}> has been ignored.".format(channel.id))
-
-
-@ignore_channel.command(name="remove", brief="Stop ignoring a channel")
-async def remove(ctx: commands.Context, channel: discord.TextChannel):
-    bot: GGBot = ctx.bot
-    await db.remove_ignored_channel(bot.db_pool, ctx.guild.id, channel.id)
-    await ctx.send("<#{}> is no longer being ignored.".format(channel.id))
-
 
 # ----- Ignore Category Commands ----- #
 @commands.has_permissions(manage_messages=True)

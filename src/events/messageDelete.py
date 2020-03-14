@@ -45,10 +45,6 @@ class MemberUpdate(commands.Cog):
         # Get the cached msg from the DB (if possible). Will be None if msg does not exist in DB
         db_cached_message = await db.get_cached_message(self.bot.db_pool, payload.guild_id, payload.message_id)
 
-        # Check if the channel we are in is ignored. If it is, bail
-        if await self.bot.is_channel_ignored(payload.guild_id, payload.channel_id):
-            await cleanup_message_cache()
-            return
 
         # Check if the category we are in is ignored. If it is, bail
         channel: discord.TextChannel = await self.bot.get_channel_safe(payload.channel_id)
@@ -104,7 +100,7 @@ class MemberUpdate(commands.Cog):
         effective_author_id = pk_system_owner.id if pk_system_owner is not None else author_id
 
         # Get the servers logging channel.
-        log_channel = await self.bot.get_event_or_guild_logging_channel(payload.guild_id, event_type, effective_author_id)
+        log_channel = await self.bot.get_event_or_guild_logging_channel(payload.guild_id, event_type, user_id=effective_author_id, channel_id=payload.channel_id)
         if log_channel is None:
             # Silently fail if no log channel is configured.
             await cleanup_message_cache()

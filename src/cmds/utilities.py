@@ -375,7 +375,7 @@ class Utilities(commands.Cog):
 
         # List all channels being ignored
         channels_msg = ""
-        _ignored_channels_ids = await db.get_ignored_channels(self.bot.db_pool, guild.id)
+        _ignored_channels_ids = await db.get_channel_overrides(self.bot.db_pool, guild.id)
         if len(_ignored_channels_ids) > 0:
             for channel_id in _ignored_channels_ids:
                 ignored_channel = await self.bot.get_channel_safe(channel_id)
@@ -590,7 +590,7 @@ class Utilities(commands.Cog):
 
         # List all channels being ignored
         channels_msg = ""
-        _ignored_channels_ids = await db.get_ignored_channels(self.bot.db_pool, guild.id)
+        _ignored_channels_ids = await db.get_channel_overrides(self.bot.db_pool, guild.id)
         if len(_ignored_channels_ids) > 0:
             for channel_id in _ignored_channels_ids:
                 ignored_channel = await self.bot.get_channel_safe(channel_id)

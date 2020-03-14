@@ -4,6 +4,7 @@ Function abilities include:
     Functions for handling long text
     Sending Error Logs to the Global error log channel
     Getting Audit logs.
+    Check permissions on a channel.
     
 Part of the Gabby Gums Discord Logger.
 """
@@ -24,6 +25,9 @@ if TYPE_CHECKING:
     from bot import GGBot
 
 log = logging.getLogger(__name__)
+
+# Type aliases
+GuildChannel = Union[discord.TextChannel, discord.VoiceChannel, discord.CategoryChannel]
 
 
 async def send_long_msg(channel: [discord.TextChannel, commands.Context], message: str, code_block: bool = False, code_block_lang: str = "python"):
@@ -171,3 +175,24 @@ def prettify_permission_name(perm_name: str) -> str:
     pretty_perm_name = "Send TTS Messages" if pretty_perm_name == "Send Tts Messages" else pretty_perm_name  # Mak sure that we capitalize the TTS acronym properly.
     return pretty_perm_name
 
+
+def check_permissions(channel: GuildChannel, additional_perms: Optional[Dict[str, bool]] = None) -> List[str]:
+    """Checks to see if the channel has the default needed permissions (Read, Send, Embed) and the passed additional permissions.
+    Returns a list of missing permissions."""
+
+    standard_perms = {'read_messages': True, 'send_messages': True, 'embed_links': True}  # Permissions that EVERY channel requires.
+    additional_perms = {} if additional_perms is None else additional_perms
+    missing_perms = []
+
+    # make sure all the permissions we are checking are valid
+    for perm, value in additional_perms:
+        if perm not in discord.Permissions.VALID_FLAGS:
+            raise TypeError('%r is not a valid permission name.' % perm)
+
+    ch_perms: discord.Permissions = channel.guild.me.permissions_in(channel)
+    for perm, value in ch_perms:
+
+        if (perm in standard_perms and standard_perms[perm] != value) or (perm in additional_perms and standard_perms[perm] != value):
+            missing_perms.append(perm)
+
+    return missing_perms

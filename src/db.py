@@ -195,30 +195,35 @@ async def get_users_overrides(pool: asyncpg.pool.Pool, sid: int) -> List[asyncpg
     return rows
 
 
-# ----- Ignored Channels DB Functions ----- #
+# region Channel Override DB Functions
 
 @db_deco
-async def add_ignored_channel(pool, sid: int, ignored_channel_id: int):  # Good
+async def add_channel_override(pool, sid: int, ignored_channel_id: int, override_log_ch: Optional[int]):  # Good
     async with pool.acquire() as conn:
-        await conn.execute("INSERT INTO ignored_channels(channel_id, server_id) VALUES($1, $2)", ignored_channel_id, sid)
+        await conn.execute("""
+                            INSERT INTO ignored_channels(channel_id, server_id, log_ch) VALUES($1, $2, $3)
+                            ON CONFLICT (server_id, channel_id)
+                            DO UPDATE
+                            SET log_ch = EXCLUDED.log_ch
+                            """, ignored_channel_id, sid, override_log_ch)
 
 
 @db_deco
-async def remove_ignored_channel(pool, sid: int, ignored_channel_id: int):  # Good
+async def remove_channel_override(pool, sid: int, ignored_channel_id: int):  # Good
     async with pool.acquire() as conn:
         await conn.execute("DELETE FROM ignored_channels WHERE server_id = $1 AND channel_id = $2", sid, ignored_channel_id)
 
 
 @db_deco
-async def get_ignored_channels(pool, sid: int) -> List[int]:  # Good
+async def get_channel_overrides(pool, sid: int) -> List[asyncpg.Record]:  # Good
     async with pool.acquire() as conn:
-        # TODO: Optimise by replacing * with channel_id
         raw_rows = await conn.fetch('SELECT * FROM ignored_channels WHERE server_id = $1', sid)
-        rows = [row["channel_id"] for row in raw_rows]
-    return rows
+    return raw_rows
+
+# endregion
 
 
-# ----- Ignored Categories DB Functions ----- #
+# region Ignored Categories DB Functions
 
 @db_deco
 async def add_ignored_category(pool, sid: int, ignored_category_id: int):  # Good
@@ -238,6 +243,8 @@ async def get_ignored_categories(pool, sid: int) -> List[int]:  # Good
         raw_rows = await conn.fetch('SELECT category_id FROM ignored_category WHERE server_id = $1', sid)
         category_ids = [row["category_id"] for row in raw_rows]
     return category_ids
+
+# endregion
 
 
 # ----- Invite DB Functions ----- #
@@ -482,12 +489,14 @@ async def create_tables(pool):
                            )
                        ''')
 
+        # ALTER TABLE ignored_channels ADD COLUMN log_ch BIGINT DEFAULT NULL;
         # Create ignored_channels table
         await conn.execute('''
                            CREATE TABLE if not exists ignored_channels(
                                 id         SERIAL PRIMARY KEY,
                                 server_id  BIGINT NOT NULL REFERENCES servers(server_id) ON DELETE CASCADE,
                                 channel_id BIGINT NOT NULL,
+                                log_ch     BIGINT DEFAULT NULL,
                                 UNIQUE (server_id, channel_id)
                            )
                        ''')
