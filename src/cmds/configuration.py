@@ -360,7 +360,7 @@ class Configuration(commands.Cog):
         """This command allows you to have Gabby Gums ignore events from users and/or redirect the logs for those events to different log channels.
         For example, you could use this to have gabby gums ignore a bot that's filling up your logs with spam or perhaps redirect the logs of moderators or users on probation.
 
-        Please be aware that these settings override the event configurations.
+        Please be aware that these settings override the event configurations and Channel Overrides.
         So if for instance were to have all the delete logs going to a channel called #delete-logs and you set up a user override for a user named Bob to redirect their logs to #bob-log, all of logs regarding Bob, including their deleted messages would go to #bob-log (of course everyone else's logs would go to where ever they normally would have)."""
         if ctx.invoked_subcommand is None:
             await ctx.send_help(self.user_overrides)
@@ -427,8 +427,12 @@ class Configuration(commands.Cog):
     @eCommands.group(name="channel_override", aliases=["channel_overrides", "ch_or", "ignore_channel"],
                      brief="Ignore or Redirect logs from specific channels",
                      description="Allows you to configure Gabby Gums to ignore or redirect logs for specific channels.",
-                     usage='<Command> [Channel] [Log Channel]')
+                     usage='<Command> [Channel] [Log Channel]',
+                     examples=["list", "redirect #vents #Serious-logs", "ignore #bots"])
     async def channel_overide(self, ctx: commands.Context):
+        """This command allows you to have Gabby Gums ignore events that originate in channels and/or redirect the logs for those events to different log channels.
+            For example, you could use this to have gabby gums ignore a noisy bot channel or perhaps redirect the logs of a serious channel to a safer log channel.
+            """
         if ctx.invoked_subcommand is None:
             await ctx.send_help(self.channel_overide)
 
