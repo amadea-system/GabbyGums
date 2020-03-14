@@ -153,7 +153,7 @@ class CompositeMessage:
         if self._author is None:
             _ = self.author
 
-        return self._author.display_name
+        return self._author.display_name if self._author is not None else "Unknown"
 
     @property
     def user_name_and_discrim(self) -> Optional[str]:
@@ -167,7 +167,7 @@ class CompositeMessage:
         if self._author is None:
             _ = self.author
 
-        return f"{self._author.name}#{self._author.discriminator}"
+        return f"{self._author.name}#{self._author.discriminator}" if self._author is not None else "Unknown"
 
     @property
     def is_pk(self) -> bool:
