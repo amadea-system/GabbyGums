@@ -19,34 +19,6 @@ def split_message(message: str) -> (str, str):
     return msg1, msg2
 
 
-def about_message() -> discord.Embed:
-    help_msg = "Created by **Luna and Hibiki** (<@!389590659335716867>).\n\n"
-    "This bot is for use on any server, with or with out pluralKit " \
-    "and most importantly can be used by/for any kind of system or singlet, " \
-    "this includes Endogenic systems, Tulpa systems, Traumagenic systems, Mixed systems, Gateway systems, roleplayers, " \
-    "and **ANYONE** else I did not specifically list.\n"
-    "This bot does NOT work with the System Time bot and we kindly request that it is not modified to work with System Time.\n"
-    "For support, suggestions, or anything else, feel free to join our support server @ https://discord.gg/3Ugade9\n\n"
-
-    embed = discord.Embed(title="Gabby Gums",
-                          description="A simple logging bot that ignores PluralKit proxies.",
-                          color=0x9932CC)
-    embed.add_field(name="Who can use Gabby Gums",
-                    value="Anyone.\n"
-                    "Regardless of system type or plurality, all people are valid. "
-                          "As such, all people are allowed to use this bot.\n"
-                    "This bot is not coded with support for the System Time bot. "
-                          "We would also kindly request that it is not modified to work with System Time")
-    embed.add_field(name="Support Server",
-                    value="For support, suggestions, just want to chat with someone, "
-                          "or anything else, feel free to join our support server @ https://discord.gg/3Ugade9")
-
-    embed.set_footer(text="Created by Luna, Hibiki, and Fluttershy aka Amadea System (Hibiki#8792) "
-                          "| Github: https://github.com/amadea-system/GabbyGums/")
-
-    return embed
-
-
 def edited_message_embed(author_id, author_name: str, author_discrim, channel_id, before_msg: str, after_msg: str,
                          message_id: str, guild_id) -> discord.Embed:
 
@@ -174,7 +146,26 @@ def member_join(member: discord.Member, invite: Optional[StoredInvite], pk_info:
                     value="{} has joined the server!!!".format(member.display_name),
                     inline=False)
     account_age = datetime.utcnow() - member.created_at
-    embed.add_field(name="Account Age", value="**{}** days old".format(account_age.days), inline=True)
+
+    if account_age.days > 0:
+        account_age_name = "Account Age"
+        account_age_value = f"**{account_age.days}** days old"
+    else:
+        account_age_name = "**New Account!**"
+
+        hours = account_age.seconds // 3600
+        minutes = (account_age.seconds % 3600) // 60
+
+        if hours > 0:
+            account_age_value = f"\N{WARNING SIGN} **Warning!** Account is only **{hours}** hours and **{minutes}** minutes old! \N{WARNING SIGN}"
+        else:
+            seconds = account_age.seconds % 60
+            account_age_value = f"\N{WARNING SIGN} **Warning!** Account is only **{minutes}** minutes and **{seconds}** seconds old! \N{WARNING SIGN}"
+
+    embed.add_field(name=account_age_name,
+                    value=account_age_value,
+                    inline=True)
+
     embed.add_field(name="Current Member Count", value="**{}** Members".format(member.guild.member_count), inline=True)
 
     if pk_info is not None:
