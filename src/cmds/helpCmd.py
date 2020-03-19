@@ -110,11 +110,12 @@ class EmbedHelp(dpy_cmds.DefaultHelpCommand):
         dest: discord.abc.Messageable = self.get_destination()
 
         # TODO: Move this to the error handler.
-        permissions: discord.Permissions = ctx.guild.me.permissions_in(dest)
-        if not permissions.embed_links:
-            await dest.send(f"Error! Gabby Gums must have the `Embed Links` permission in this channel to continue. Please give Gabby Gums the `Embed Links` permission and try again."
-                            f"\nIf you need assistance, please join our support server @ {support_link} and we will be happy to help you.")
-            return
+        if ctx.guild is not None:
+            permissions: discord.Permissions = ctx.guild.me.permissions_in(dest)
+            if not permissions.embed_links:
+                await dest.send(f"Error! Gabby Gums must have the `Embed Links` permission in this channel to continue. Please give Gabby Gums the `Embed Links` permission and try again."
+                                f"\nIf you need assistance, please join our support server @ {support_link} and we will be happy to help you.")
+                return
 
         embed = discord.Embed(title='Gabby Gums Help', color=help_embed_color)
 

@@ -18,6 +18,7 @@ import eCommands
 
 import db
 import miscUtils
+from utils.paginator import FieldPages
 
 if TYPE_CHECKING:
     from bot import GGBot
@@ -70,6 +71,49 @@ class Dev(commands.Cog):
             logging.info(log_msg)
             await miscUtils.send_long_msg(ctx, log_msg)
             await asyncio.sleep(1)
+
+    @commands.command(name="has_pk")
+    async def has_pk(self, ctx: commands.Context):
+        """This command is to show if there have been any failures in detecting PK in servers that do have PK.
+        It is being used to ensure that the GGBot.is_pk_here method works 100% before actually using it to prevent disruptions to logging"""
+        embed_entries = []
+        problems = []
+        has_pk_stats = self.bot.has_pk_cache
+
+        for key, value in has_pk_stats.items():
+            header = f"{key}"
+
+            get = 0
+            fetch = 0
+            no_pk = 0
+            for item in value:
+                if item == "get":
+                    get += 1
+                elif item == "fetch":
+                    fetch += 1
+                elif item == "no_pk":
+                    no_pk += 1
+                else:
+                    log.warning(f"Unrecognized item in has pk cache: {item}")
+
+            if (get > 0 or fetch > 0) and no_pk > 0:
+                problems.append(header)
+
+            msg = F"`Get:  ` {get}\n`Fetch:` {fetch}\n`No PK:` {no_pk}"
+            embed_entries.append((header, msg))
+
+        if len(problems) > 0:
+            header = f"Problems Found:"
+            msg = ", ".join(problems)
+            embed_entries.insert(0, (header, msg))
+        else:
+            header = f"No Problems Found:"
+            msg = "\N{Grinning Face}"
+            embed_entries.insert(0, (header, msg))
+
+        page = FieldPages(ctx, entries=embed_entries, per_page=25)
+        page.embed.title = f"Has PK Check Stats:"
+        await page.paginate()
 
 
 def setup(bot):

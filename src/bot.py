@@ -4,6 +4,7 @@
 import sys
 import logging
 import traceback
+from collections import defaultdict
 from typing import Optional, Dict, Tuple, List, Union
 
 import discord
@@ -48,6 +49,7 @@ class GGBot(commands.Bot):
         # self.alerted_guilds: List[Tuple[str, int]] = []  # Stores a list of guilds that have been alerted to permission problems.
         self.has_permission_problems: List[int] = []
         self.invites_initialized = False
+        self.has_pk_cache = defaultdict(list)
 
         self.update_playing.start()
 
@@ -191,24 +193,23 @@ class GGBot(commands.Bot):
         return False
     # endregion
 
-
     async def is_pk_here(self, guild: discord.Guild) -> bool:
         """Checks if Plural Kit exists on the server. Returns bool"""
 
         pk_user: Union[discord.User, discord.Member] = guild.get_member(self.pk_id)
         if pk_user is not None:
-            log.info(f"Found PK with get in {guild.name} ({guild.id})")
+            self.has_pk_cache[f"{guild.name}\n{guild.id}"].append("get")
             return True
 
         # Couldn't find PK in cache, attempting fetch.
         try:
             pk_user = await guild.fetch_member(self.pk_id)
             if pk_user is not None:
-                await log_error_msg(self, f"Found PK with **Fetch** in {guild.name} ({guild.id})")
+                self.has_pk_cache[f"{guild.name}\n{guild.id}"].append("fetch")
                 return True
 
         except discord.NotFound:
-            await log_error_msg(self, f"Could not find pk in {guild.name} ({guild.id})")
+            self.has_pk_cache[f"{guild.name}\n{guild.id}"].append("no_pk")
             return False
 
 

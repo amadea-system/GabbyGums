@@ -579,30 +579,39 @@ class Utilities(commands.Cog):
 
         # List all users being ignored
         ignored_users_msg_fragments = []
-        ignored_users_ids = await db.get_users_overrides(self.bot.db_pool, guild.id)
-        if len(ignored_users_ids) > 0:
-            for user_id in ignored_users_ids:
-                ignored_users_msg_fragments.append(f"<@!{user_id}>")
+        ignored_users = await db.get_users_overrides(self.bot.db_pool, guild.id)
+        if len(ignored_users) > 0:
+            for ignored_user in ignored_users:
+                if ignored_user['log_ch'] is not None:
+                    ignored_users_msg_fragments.append(f"Redirect <@{ignored_user['user_id']}> -> <#{ignored_user['log_ch']}>")
+                else:
+                    ignored_users_msg_fragments.append(f"Ignored: <@{ignored_user['user_id']}>")
+
             ignored_users_msg = "\n".join(ignored_users_msg_fragments)
-            conf_embed.add_field(name="Users Currently Being Ignored ",
+            conf_embed.add_field(name="Users Currently Being Ignored or Redirected",
                                  value=f"{ignored_users_msg}\n\N{ZERO WIDTH NON-JOINER}",
-                                 inline=True)
+                                 inline=False)
 
         # List all channels being ignored
-        channels_msg = ""
-        _ignored_channels_ids = await db.get_channel_overrides(self.bot.db_pool, guild.id)
-        if len(_ignored_channels_ids) > 0:
-            for channel_id in _ignored_channels_ids:
-                ignored_channel = await self.bot.get_channel_safe(channel_id)
+        channels_msg = []
+        channel_overrides = await db.get_channel_overrides(self.bot.db_pool, guild.id)
+        if len(channel_overrides) > 0:
+            for ch_override in channel_overrides:
+                ignored_channel = await self.bot.get_channel_safe(ch_override['channel_id'])
                 if ignored_channel is not None:
-                    channels_msg = channels_msg + "<#{}>\n".format(ignored_channel.id)
+                    if ch_override['log_ch'] is not None:
+                        channels_msg.append(f"Redirect <#{ch_override['channel_id']}> -> <#{ch_override['log_ch']}>")
+                    else:
+                        channels_msg.append(f"Ignored: <#{ch_override['channel_id']}>")
+
                 else:
-                    channels_msg = channels_msg + "Deleted channel w/ ID: {}\n".format(channel_id)
-            conf_embed.add_field(name="Channels Currently Being Ignored ", value=f"{channels_msg}\N{ZERO WIDTH NON-JOINER}",
-                                 inline=True)
+                    channels_msg.append("Deleted channel w/ ID: {}\n".format(ch_override['channel_id']))
+            channels_msg = '\n'.join(channels_msg)
+            conf_embed.add_field(name="Channels Currently Being Ignored or Redirected", value=f"{channels_msg}\N{ZERO WIDTH NON-JOINER}",
+                                 inline=False)
         else:
-            conf_embed.add_field(name="Channels Currently Being Ignored ", value="**NONE**\n\N{ZERO WIDTH NON-JOINER}",
-                                 inline=True)
+            conf_embed.add_field(name="Channels Currently Being Ignored or Redirected", value="**NONE**\n\N{ZERO WIDTH NON-JOINER}",
+                                 inline=False)
 
         # List all categories being ignored
         _ignored_categories = await db.get_ignored_categories(self.bot.db_pool, guild.id)
@@ -611,10 +620,10 @@ class Utilities(commands.Cog):
                                            _ignored_categories]
             categories_msg = "\n".join(categories_id_msg_fragments)
             conf_embed.add_field(name="All channels under the following categories are currently being ignored ",
-                                 value=f"{categories_msg}\n\N{ZERO WIDTH NON-JOINER}", inline=True)
+                                 value=f"{categories_msg}\n\N{ZERO WIDTH NON-JOINER}", inline=False)
         else:
             conf_embed.add_field(name="All channels under the following categories are currently being ignored ",
-                                 value="**NONE**\n\N{ZERO WIDTH NON-JOINER}", inline=True)
+                                 value="**NONE**\n\N{ZERO WIDTH NON-JOINER}", inline=False)
 
         # conf_embed.description = "\N{ZERO WIDTH NON-JOINER}\n\N{ZERO WIDTH NON-JOINER}"
 
