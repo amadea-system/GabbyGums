@@ -413,6 +413,7 @@ class Configuration(commands.Cog):
 
     @user_overrides.command(name="remove", brief="Stop ignoring or redirecting a member")
     async def u_remove(self, ctx: commands.Context, member: discord.Member):
+        await db.remove_user_override(self.bot.db_pool, ctx.guild.id, member.id)
 
         embed = discord.Embed(color=gabby_gums_dark_green(),
                               description=f"Events from <@{member.id}> will no longer be ignored or redirected.\n")
