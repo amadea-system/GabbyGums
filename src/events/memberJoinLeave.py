@@ -179,15 +179,25 @@ class MemberJoinLeave(commands.Cog):
 
 
     async def get_stored_invites(self, guild_id: int) -> db.StoredInvites:
+        """Retrieves the stored invites from the DB"""
         stored_invites = await db.get_invites(self.bot.db_pool, guild_id)
         return stored_invites
 
 
     async def update_invite_cache(self, guild: discord.Guild, invites: Optional[List[discord.Invite]] = None,
-                                  stored_invites: Optional[db.StoredInvites] = None):
+                                  stored_invites: Optional[db.StoredInvites] = None) -> Optional[db.StoredInvites]:
+        """
+        Pulls all the invites for a guild from Discord, Adds the new ones to the DB and removes the deleted ones from the DB.
+
+        Can optionally accept a list of upto date discord.Invites
+            and/or recent potentially stale (From discord POV) StoredInvite obj for API and DB efficiency
+
+        Returns an up to date StoredInvites Object.
+        """
+
         try:
             if not guild.me.guild_permissions.manage_guild:
-                return
+                return  # We don't have permissions to get any invites from this guild! Bail.
 
             if invites is None:
                 invites: List[discord.Invite] = await guild.invites()
@@ -199,7 +209,9 @@ class MemberJoinLeave(commands.Cog):
                 stored_invites = await self.get_stored_invites(guild.id)
 
             await asyncio.sleep(1)  # Wait a sec before deleting any invites in case an on_invite_delete fired right after this to allow it to grab the invite cache.
-            await self.remove_invalid_invites(guild.id, invites, stored_invites)
+            valid_invites = await self.remove_invalid_invites(guild.id, invites, stored_invites)
+            return valid_invites
+
         except discord.Forbidden as e:
             logging.exception("update_invite_cache error: {}".format(e))
 
@@ -210,19 +222,28 @@ class MemberJoinLeave(commands.Cog):
 
 
     async def remove_invalid_invites(self, guild_id: int, current_invites: List[discord.Invite],
-                                     stored_invites: Optional[db.StoredInvites]):
+                                     stored_invites: db.StoredInvites) -> db.StoredInvites:
+        """
+        From a list of upto date Discord Invites, and a potentially stale StoredInvites obj,
+        Remove all invalid Invites from the DB and return an up to date StoredInvites Object.
+        """
 
-        def search_for_invite(_current_invites: List[discord.Invite], invite_id):
+        def search_for_invite(_current_invites: List[discord.Invite], invite_id: str) -> Optional[discord.Invite]:
             for invite in _current_invites:
                 if invite.id == invite_id:
                     return invite
             return None
 
-
+        valid_invites: List[db.StoredInvite] = []
         for stored_invite in stored_invites.invites:
             current_invite = search_for_invite(current_invites, stored_invite.invite_id)
             if current_invite is None:
                 await db.remove_invite(self.bot.db_pool, guild_id, stored_invite.invite_id)
+            else:
+                valid_invites.append(stored_invite)
+
+        stored_invites.invites = valid_invites
+        return stored_invites
 
 
     async def find_used_invite(self, member: discord.Member) -> Optional[db.StoredInvite]:
