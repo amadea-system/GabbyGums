@@ -9,6 +9,8 @@ from typing import Optional, Dict, Union
 from db import StoredInvite, CachedMessage
 import logging
 
+from utils.moreColors import gabby_gums_dark_green, gabby_gums_light_green, gabby_gums_purple
+
 log = logging.getLogger(__name__)
 
 
@@ -384,6 +386,22 @@ def user_avatar_update(before: discord.User, after: discord.User, embed_image_fi
 
     embed.set_footer(text="User ID: {}".format(after.id))
 
+    return embed
+
+
+def command_timed_out_embed(message: str = "The command has timed out.", color: discord.Color = discord.Color.dark_orange) -> discord.Embed:
+    """Returns an embed formatted for command time outs"""
+    embed = discord.Embed(title="Command Timed Out!",
+                          description=f"❌ {message}",
+                          color=color)
+    return embed
+
+
+def command_canceled_embed(message: str = "The command was canceled.", color: discord.Color = discord.Color.dark_orange) -> discord.Embed:
+    """Returns an embed formatted for canceled commands"""
+    embed = discord.Embed(title="**Command Canceled**",
+                          description=f"❌ {message}",
+                          color=color)
     return embed
 
 
