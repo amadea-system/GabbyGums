@@ -389,7 +389,7 @@ def user_avatar_update(before: discord.User, after: discord.User, embed_image_fi
     return embed
 
 
-def command_timed_out_embed(message: str = "The command has timed out.", color: discord.Color = discord.Color.dark_orange) -> discord.Embed:
+def command_timed_out_embed(message: str = "The command has timed out.", color: discord.Color = discord.Color.dark_orange()) -> discord.Embed:
     """Returns an embed formatted for command time outs"""
     embed = discord.Embed(title="Command Timed Out!",
                           description=f"❌ {message}",
@@ -397,7 +397,7 @@ def command_timed_out_embed(message: str = "The command has timed out.", color: 
     return embed
 
 
-def command_canceled_embed(message: str = "The command was canceled.", color: discord.Color = discord.Color.dark_orange) -> discord.Embed:
+def command_canceled_embed(message: str = "The command was canceled.", color: discord.Color = discord.Color.dark_orange()) -> discord.Embed:
     """Returns an embed formatted for canceled commands"""
     embed = discord.Embed(title="**Command Canceled**",
                           description=f"❌ {message}",
