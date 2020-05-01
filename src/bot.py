@@ -158,11 +158,8 @@ class GGBot(commands.Bot):
         """
         guild_id = int(guild_id)
         channel_id = int(channel_id)
-        log.info(f"passed ch_id: {channel_id} {type(channel_id)}")
         channel_overrides = await db.get_channel_overrides(self.db_pool, guild_id)
-        log.info(f"ch_overrides: {channel_overrides}")
         for channel in channel_overrides:
-            log.info(f"ch_id: {channel['channel_id']} {type(channel['channel_id'])}, log_ch: {channel['log_ch']} {type(channel['log_ch'])}")
             if channel['channel_id'] == channel_id:
                 return True, channel['log_ch']
         return False, None
