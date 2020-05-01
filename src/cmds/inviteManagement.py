@@ -90,7 +90,7 @@ class InviteManagement(commands.Cog, name="Invite Management"):
                 invite_to_name = current_invites.find_invite(invite.id)
                 if invite_to_name is not None and invite_to_name.invite_name is not None:
 
-                    conf_embed = discord.Embed(title="**Invite already named!**",
+                    conf_embed = discord.Embed(title="Invite already named!",
                                                description=f"The invite **{invite.id}** already has a name of **{invite_to_name.invite_name}**!\n"
                                                            f"Do you wish to rename it to **{nickname}**?",
                                                color=gabby_gums_dark_green())
@@ -109,7 +109,7 @@ class InviteManagement(commands.Cog, name="Invite Management"):
 
             await db.update_invite_name(bot.db_pool, ctx.guild.id, invite.id, invite_name=nickname)
 
-            success_embed = discord.Embed(title="**Invite Named**",
+            success_embed = discord.Embed(title="Invite Named",
                                           description=f"✅ **{invite.id}** has been given the nickname: **{nickname}**",
                                           color=gabby_gums_dark_green())
 
@@ -118,13 +118,18 @@ class InviteManagement(commands.Cog, name="Invite Management"):
 
     @invite_manage.command(name="unname", brief="Removes the name from an invite.",
                            usage='<Invite ID>')
-    async def _unname_invite(self, ctx: commands.Context, invite_id: discord.Invite):
+    async def _unname_invite(self, ctx: commands.Context, input_invite: discord.Invite):
         bot: GGBot = ctx.bot
         if ctx.guild.me.guild_permissions.manage_guild:
             invites: 'MemberJoinLeave' = self.bot.get_cog('MemberJoinLeave')
             await invites.update_invite_cache(ctx.guild)  # refresh the invite cache.
-            await db.update_invite_name(bot.db_pool, ctx.guild.id, invite_id.id)
-            await ctx.send("{} no longer has a nickname.".format(invite_id.id))
+            await db.update_invite_name(bot.db_pool, ctx.guild.id, input_invite.id)
+
+            success_embed = discord.Embed(title="Invite Name Removed",
+                                          description=f"✅ **{input_invite.id}** no longer has a nickname",
+                                          color=gabby_gums_dark_green())
+
+            await ctx.send(embed=success_embed)
 
 
 def setup(bot):
