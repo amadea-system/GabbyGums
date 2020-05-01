@@ -55,24 +55,30 @@ class InviteManagement(commands.Cog, name="Invite Management"):
         if ctx.guild.me.guild_permissions.manage_guild:
 
             invites: 'MemberJoinLeave' = self.bot.get_cog('MemberJoinLeave')
-            await invites.update_invite_cache(ctx.guild)  # refresh the invite cache.
-            invites: db.StoredInvites = await invites.get_stored_invites(ctx.guild.id)
-            embed = discord.Embed(title="Current Invites", color=0x9932CC)
+            current_invites: db.StoredInvites = await invites.update_invite_cache(ctx.guild)  # refresh the invite cache.
 
             embed_count = 0
-            for invite in invites.invites:
-                embed.add_field(name=invite.invite_id,
-                                value="Uses: {}\n Nickname: {}".format(invite.uses, invite.invite_name))
-                embed_count += 1
-                if embed_count == 25:
-                    await ctx.send(embed=embed)
-                    embed = discord.Embed(title="Current Invites Cont.", color=0x9932CC)
+            if len(current_invites.invites) > 0:
+                embed = discord.Embed(title="Current Invites", color=gabby_gums_dark_green())
 
-            if embed_count % 25 != 0:
+                for invite in current_invites.invites:
+                    embed.add_field(name=invite.invite_id,
+                                    value="Uses: {}\n Nickname: {}".format(invite.uses, invite.invite_name))
+                    embed_count += 1
+                    if embed_count == 25:
+                        await ctx.send(embed=embed)
+                        embed = discord.Embed(title="Current Invites Cont.", color=gabby_gums_dark_green())
+
+                if embed_count % 25 != 0:
+                    await ctx.send(embed=embed)
+            else:
+                embed = discord.Embed(title="Current Invites",
+                                      description="This server does not currently have any invites.",
+                                      color=gabby_gums_dark_green())
                 await ctx.send(embed=embed)
 
-
-    @invite_manage.command(name="name", brief="Lets you give an invite a nickname so it can be easier to identify.",#usage='<Invite ID> <Invite Nickname>'
+    @invite_manage.command(name="name", brief="Lets you give an invite a nickname so it can be easier to identify.",
+                           usage='<Invite ID> <Invite Nickname>',
                            examples=["Xwhk89T Gabby Gums Github Page"])
     async def _name_invite(self, ctx: commands.Context, invite: discord.Invite, *, nickname: str = None):
         bot: GGBot = ctx.bot
