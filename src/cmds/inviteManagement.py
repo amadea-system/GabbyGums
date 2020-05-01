@@ -77,6 +77,47 @@ class InviteManagement(commands.Cog, name="Invite Management"):
                                       color=gabby_gums_dark_green())
                 await ctx.send(embed=embed)
 
+
+    @invite_manage.command(name="create", brief="Lets you create a new invite with a nickname.",
+                           usage='<Channel ID> <Invite Nickname>',
+                           examples=["#welcome Gabby Gums Github Page", "123456789123456789 Awesome Server Hub!"])
+    async def _create_invite(self, ctx: commands.Context,
+                             input_channel: Union[discord.TextChannel, discord.VoiceChannel, discord.CategoryChannel],
+                             *, nickname: str = None):
+        bot: GGBot = ctx.bot
+
+        if ctx.guild.me.guild_permissions.manage_guild:
+
+            ch_perm: discord.Permissions = ctx.guild.me.permissions_in(input_channel)
+            if not ch_perm.create_instant_invite:
+                await ctx.send("⚠ Gabby gums needs the **Create Invite** permission to create invites.\n"
+                               "(It requires this permission globally AND for the channel the invite is being created for)")
+                return
+
+            # create the new invite.
+            new_invite = await input_channel.create_invite(unique=True, reason=f"Invite created at the request of {ctx.author.display_name}.")
+
+            # Store the invite (It's probable this will result in duplicate store invite calls. but that's okay)
+            await db.store_invite(self.bot.db_pool, ctx.guild.id, new_invite.id, new_invite.uses, new_invite.max_uses, new_invite.inviter.id, new_invite.created_at)
+
+            # Name the invite.
+            await db.update_invite_name(bot.db_pool, ctx.guild.id, new_invite.id, invite_name=nickname)
+
+            # success_embed = discord.Embed(title="New Invite Created And Named",
+            #                               description=f"✅ \n"
+            #                                           f"A new invite with the URL **{new_invite.url}** has been created.\n"
+            #                                           f"It has been given the nickname: **{nickname}**",
+            #                               color=gabby_gums_dark_green())
+
+            success_embed = discord.Embed(title="New Invite Created And Named",
+                                          description=f"✅\n"
+                                                      f"A new invite for <#{input_channel.id}> has been created.\n"
+                                                      f"It has been given the nickname: **{nickname}**",
+                                          color=gabby_gums_dark_green())
+
+            await ctx.send(f"Invite Link: <{new_invite.url}>", embed=success_embed)
+
+
     @invite_manage.command(name="name", brief="Lets you give an invite a nickname so it can be easier to identify.",
                            usage='<Invite ID> <Invite Nickname>',
                            examples=["Xwhk89T Gabby Gums Github Page"])

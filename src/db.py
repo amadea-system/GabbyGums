@@ -252,11 +252,15 @@ async def get_ignored_categories(pool, sid: int) -> List[int]:  # Good
 @db_deco
 async def store_invite(pool, sid: int, invite_id: str, invite_uses: int = 0, max_uses: Optional[int] = None, inviter_id: Optional[str] = None, created_at: Optional[datetime] = None):
     async with pool.acquire() as conn:
-        does_exist = await conn.fetchval("select exists(select 1 from invites where server_id = $1 and invite_id = $2)", sid, invite_id)
-        if does_exist is False:
-            await add_new_invite(pool, sid, invite_id, max_uses, inviter_id, created_at, invite_uses)
-        else:
-            await update_invite_uses(pool, sid, invite_id, invite_uses)
+        ts = math.floor(created_at.timestamp()) if created_at is not None else None
+        await conn.execute(
+            """
+            INSERT INTO invites(server_id, invite_id, uses, max_uses, inviter_id, created_ts) VALUES($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (server_id, invite_id)
+            DO UPDATE 
+            SET uses = EXCLUDED.uses
+            """,
+            sid, invite_id, invite_uses, max_uses, inviter_id, ts)
 
 
 async def add_new_invite(pool, sid: int, invite_id: str, max_uses: int, inviter_id: str, created_at: datetime, invite_uses: int = 0):
