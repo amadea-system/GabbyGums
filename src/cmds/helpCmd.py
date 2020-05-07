@@ -16,12 +16,13 @@ import discord
 from discord.ext import commands as dpy_cmds
 
 from miscUtils import split_text
+from utils.moreColors import gabby_gums_purple
 
 log = logging.getLogger(__name__)
 
 support_link = "https://discord.gg/3Ugade9"
 
-help_embed_color = 0x9932CC
+help_embed_color = gabby_gums_purple()
 
 
 class EmbedHelp(dpy_cmds.DefaultHelpCommand):
