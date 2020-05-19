@@ -34,32 +34,6 @@ client = GGBot(command_prefix="g!",
                case_insensitive=True)
 
 
-async def is_channel_ignored(pool: asyncpg.pool.Pool, guild_id: int, channel_id: int) -> bool:
-    _ignored_channels = await db.get_ignored_channels(pool, int(guild_id))
-    if int(channel_id) in _ignored_channels:
-        return True  # TODO: Optimise this
-    return False
-
-
-async def is_category_ignored(pool: asyncpg.pool.Pool, guild_id: int, category: Optional[discord.CategoryChannel]) -> bool:
-    if category is not None:  # If channel is not in a category, don't bother querying DB
-        _ignored_categories = await db.get_ignored_categories(pool, int(guild_id))
-        if category.id in _ignored_categories:
-            return True
-    return False
-
-
-async def get_channel_safe(channel_id: int) -> Optional[discord.TextChannel]:
-    channel = client.get_channel(channel_id)
-    if channel is None:
-        logging.info("bot.get_channel failed. Querying API...")
-        try:
-            channel = await client.fetch_channel(channel_id)
-        except discord.NotFound:
-            return None
-    return channel
-
-
 @client.event
 async def on_ready():
     logging.info('Connected using discord.py version {}!'.format(discord.__version__))
@@ -67,10 +41,7 @@ async def on_ready():
     logging.info("Connected to {} servers.".format(len(client.guilds)))
     logging.info('------')
 
-    # ensure the invite cache is upto date on connection.
     logging.warning("Gabby Gums is fully loaded.")
-
-
 
 
 # ----- Ignore Category Commands ----- #
