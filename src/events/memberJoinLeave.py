@@ -4,6 +4,7 @@ Logs from these event include:
     When a user joins
     When a user leaves
     When a user is part of a PK system that has been banned
+    When a user is kicked
 
 Part of the Gabby Gums Discord Logger.
 """

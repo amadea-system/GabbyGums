@@ -9,11 +9,11 @@ Function abilities include:
 Part of the Gabby Gums Discord Logger.
 """
 
-import logging
-import copy
-import traceback
 import sys
 import string
+import asyncio
+import logging
+import traceback
 
 from datetime import datetime, timedelta
 from typing import Union, Optional, Dict, List, TYPE_CHECKING
@@ -146,7 +146,22 @@ class MissingAuditLogPermissions(Exception):
 
 
 async def get_audit_logs(guild: discord.Guild, audit_action: discord.AuditLogAction, target_user: Union[discord.User, discord.Member, discord.Object],
-                         in_last: Optional[timedelta] = None) -> List[discord.AuditLogEntry]:
+                         in_last: Optional[timedelta] = None, delay_before_fetch: int = 1) -> List[discord.AuditLogEntry]:
+    """
+    Fetches the audit logs from Discord API, then filters the logs to include
+     only those that match the audit log action and target user in the last timedelta period specified.
+    Additionally, you can specify a delay before fetching the logs using delay_before_fetch.
+     This is useful for avoiding a race condition with Discord.
+
+    Raises utils.miscUtils.MissingAuditLogPermissions if we are missing permissions to view the audit logs.
+
+    :param guild: The Guild to fettch the audit logs from
+    :param audit_action: The audit log type that we want to filter on
+    :param target_user: The user we want to filter on
+    :param in_last: How far back in time should we request logs for
+    :param delay_before_fetch: How long should we wait (in seconds) before fetching the logs.
+    :return: All the logs that match.
+    """
 
     permissions: discord.Permissions = guild.me.guild_permissions
     if permissions.view_audit_log:
@@ -160,17 +175,16 @@ async def get_audit_logs(guild: discord.Guild, audit_action: discord.AuditLogAct
             else:
                 return entry.created_at > after_time
 
+        await asyncio.sleep(delay_before_fetch)  # Sleep for a bit to ensure we don't hit a race condition with the Audit Log.
         audit_log_entries = await guild.audit_logs(action=audit_action, oldest_first=False).filter(predicate).flatten()
-        # entries = []
-        # async for audit_log in audit_log_entries:
-        #     entries.append(audit_log)
-        #     log.info(f"Entry: {audit_log} @ {audit_log.created_at}")
+
         return audit_log_entries
     else:
         raise MissingAuditLogPermissions
 
 
 def prettify_permission_name(perm_name: str) -> str:
+    """Takes a internal D.py permission name (such as send_tts_messages) and converts it to a prettified form suitable for showing to users (send_tts_messages -> Send TTS Messages)"""
     pretty_perm_name = string.capwords(f"{perm_name}".replace('_', ' '))  # Capitalize the permission names and replace underlines with spaces.
     pretty_perm_name = "Send TTS Messages" if pretty_perm_name == "Send Tts Messages" else pretty_perm_name  # Mak sure that we capitalize the TTS acronym properly.
     return pretty_perm_name

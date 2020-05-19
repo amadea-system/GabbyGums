@@ -3,8 +3,6 @@ Cog for the on_member_ban and on_member_unban events.
 Logs from these event include:
     When a user is banned
     When a user is unbanned
-
-It also (temporarily) handles the on_member_join event for only the following conditions:
     Detects and then sending a warning embed in the case where the joining user has a banned PK account.
 
 Part of the Gabby Gums Discord Logger.
@@ -52,7 +50,6 @@ class MemberBans(commands.Cog):
             pk_response = None
             system_id = None
 
-
         if system_id is not None and pk_response is not None:
             await db.add_banned_system(self.bot.db_pool, guild.id, system_id, user.id)
 
@@ -90,8 +87,10 @@ class MemberBans(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_unban(self, guild: discord.Guild, user: discord.User):
+        # Log the actual unbanning of the account
         await self.log_member_ban_or_unban(guild, user, "unban")
 
+        # Then check if there is an associated PK account and log that if there is.
         log.info("Checking to see if user has any associated banned discord accounts...")
         try:
             pk_response = await get_pk_system_from_userid(user.id)
@@ -181,7 +180,6 @@ class MemberBans(commands.Cog):
                                       ban_or_unban: str, pk_system_info: Optional[Dict] = None):
         """ If ban, use "ban". if unban, use "unban" """
         log.info(f"User {ban_or_unban} Guild: {guild}, User: {user}")
-        await asyncio.sleep(0.5)  # Sleep for a bit to ensure we don't hit a race condition with the Audit Log.
         if ban_or_unban.lower() == "ban":
             audit_action = discord.AuditLogAction.ban
             event_type = "member_ban"
